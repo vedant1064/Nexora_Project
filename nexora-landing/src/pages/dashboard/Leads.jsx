@@ -37,7 +37,7 @@ export default function Leads({ leads, badgeColor, loadChatHistory }) {
                     <span className="text-sm">{l.conversion_probability}%</span>
                   </div>
                 </td>
-                <td className="p-4 text-gray-400 text-sm truncate max-w-[200px]">{l.ai_summary}</td>
+                <td className="p-4 text-gray-400 text-sm truncate max-w-[200px]">{l.latest_intent || "No intent detected"} </td>
               </tr>
             ))}
           </tbody>

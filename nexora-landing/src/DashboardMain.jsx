@@ -1,6 +1,7 @@
 // Purani line: import { useEffect, useState } from "react";
 // ✅ Nayi line (Ise copy karo):
 import { useEffect, useState, useRef } from "react";
+import { jwtDecode } from "jwt-decode";
 
 // ✅ Claude's Logical Imports - Correct Paths
 import Analytics from "./pages/dashboard/Analytics.jsx";
@@ -11,17 +12,27 @@ import LiveChat from "./pages/dashboard/LiveChat.jsx";
 import Pricing from "./pages/dashboard/Pricing.jsx";
 import Profile from "./pages/dashboard/Profile.jsx";
 import EditBusinessModal from "./pages/dashboard/EditBusinessModal.jsx";
+import Overview from "./pages/Dashboard/Overview"; // 👈 Path check kar lena sahi ho
+import AIStrategy from "./pages/Dashboard/AIStrategy"; // 👈 AIStrategy bhi import kar lo agar use kar rahe ho
 
-// Icons & Animation
 import { 
-  LayoutDashboard, Users, Package, MessageSquare, 
-  BarChart3, CreditCard, Settings, LogOut, Flame, Thermometer, TrendingUp 
+  LayoutDashboard, Zap, Users, Package, MessageSquare, 
+  BarChart3, CreditCard, Settings, LogOut, Flame, 
+  Thermometer, TrendingUp, ShoppingBag, ChevronDown,
+  X, Mail, ShieldCheck // 👈 YE TEENO ADD KARO
 } from "lucide-react";
+
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function DashboardMain() {
   const BIZ_ID = localStorage.getItem("business_id");
   const token = localStorage.getItem("token");
+
+  // 1. Token decode karke Google data nikalo
+  let googleUser = null;
+  if (token) {
+    try { googleUser = jwtDecode(token); } catch (e) {}
+  }
 
   // --- STATE MANAGEMENT ---
   const [leads, setLeads] = useState([]);
@@ -42,9 +53,9 @@ const handleSubscription = (planKey) => {
       name: "Nexora AI",
       description: `Upgrade to ${planKey}`,
       prefill: {
-        name: "Vedant Ojha",
-        email: "vedant@gmail.com",
-        contact: "919999999999" 
+        name: me?.name || "User", // 'me' state se naam uthao
+        email: me?.email || "",   // 'me' state se email uthao
+        contact: ""               // Contact user khud bhar dega
       },
 
       // ✅ YE WALA PART UPDATE KARO
@@ -81,7 +92,11 @@ const handleSubscription = (planKey) => {
 // --- PAYMENT LOGIC END ---
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
-  const [me, setMe] = useState(null);
+  const [me, setMe] = useState({
+    name: googleUser?.name || "User",
+    email: googleUser?.email || "",
+    picture: googleUser?.picture || null
+  });
   const [chatMessages, setChatMessages] = useState([]);
   const chatEndRef = useRef(null); // 👈 Ye scroll target define karega
   const [chatInput, setChatInput] = useState("");
@@ -89,6 +104,9 @@ const handleSubscription = (planKey) => {
   const [newProduct, setNewProduct] = useState({ name: "", price: "", description: "" });
   const [profileOpen, setProfileOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
+
+  const [editingProduct, setEditingProduct] = useState(null); 
+  const [editProductModalOpen, setEditProductModalOpen] = useState(false);
 
   // --- DASHBOARD REAL-TIME STATS (SAFE CALCULATION) ---
   const totalLeads = Array.isArray(leads) ? leads.length : 0;
@@ -107,7 +125,12 @@ const handleSubscription = (planKey) => {
       headers: { Authorization: `Bearer ${token}` } 
     })
     .then(res => res.json())
-    .then(data => { if (data && !data.detail) setMe(data); })
+    .then(data => { 
+      if (data && !data.detail) {
+        // Purane state (Google data) ko backend data ke saath merge karo
+        setMe(prev => ({ ...prev, ...data })); 
+      }
+    })
     .catch(err => console.error("Me fetch error:", err));
     
     const refreshData = () => { fetchLeads(); fetchProducts(); };
@@ -117,26 +140,45 @@ const handleSubscription = (planKey) => {
   }, [BIZ_ID, token]);
 
   const fetchLeads = () => {
-  if (!BIZ_ID || !token) return;
-  fetch(`http://127.0.0.1:8000/leads/${BIZ_ID}`, { // 👈 URL check karo
-    headers: { Authorization: `Bearer ${token}` } 
+    const currentId = localStorage.getItem("business_id");
+    const currentToken = localStorage.getItem("token");
+    
+    if (!currentId || currentId === "null" || !currentToken) return;
+
+    fetch(`http://127.0.0.1:8000/leads/${currentId}`, { 
+      headers: { Authorization: `Bearer ${currentToken}` } 
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (Array.isArray(data)) setLeads(data); 
+    })
+    .catch(err => console.error("Leads fetch error:", err));
+  };
+
+  const fetchProducts = () => {
+  const currentId = localStorage.getItem("business_id");
+  const currentToken = localStorage.getItem("token");
+
+  if (!currentId || !currentToken) return;
+
+  fetch(`http://127.0.0.1:8000/products/${currentId}`, { 
+    headers: { Authorization: `Bearer ${currentToken}` } 
   })
   .then(res => res.json())
   .then(data => {
-    console.log("LEADS DATA:", data); // 👈 Debugging ke liye ye line daalo
-    if (Array.isArray(data)) setLeads(data); 
+    console.log("📦 Data received from Backend:", data);
+    // ✅ Agar backend se empty array [] aa raha hai tab bhi check karega
+    if (Array.isArray(data)) {
+      setProducts(data); 
+    } else {
+      setProducts([]); // Security ke liye khali array set karo
+    }
   })
-  .catch(err => console.error("Leads fetch error:", err));
+  .catch(err => {
+    console.error("Fetch Products Error:", err);
+    setProducts([]);
+  });
 };
-
-  const fetchProducts = () => {
-    fetch(`http://127.0.0.1:8000/products/${BIZ_ID}`, { 
-      headers: { Authorization: `Bearer ${token}` } 
-    })
-    .then(res => res.json())
-    .then(setProducts)
-    .catch(() => {});
-  };
 
   // DashboardMain.jsx mein fetch logic ke niche:
   useEffect(() => {
@@ -144,6 +186,7 @@ const handleSubscription = (planKey) => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages]);
 
+  
   const sendChatMessage = () => {
   if (!chatInput.trim()) return;
   const userMsg = { role: "user", text: chatInput, time: new Date().toLocaleTimeString() };
@@ -214,45 +257,108 @@ const loadChatHistory = (phone) => {
   // --- YE DONO FUNCTIONS PASTE KARO ---
 
   const createProduct = () => {
+  const currentToken = localStorage.getItem("token");
   const currentBizId = localStorage.getItem("business_id");
-  
-  if (!newProduct.name || !newProduct.price) {
-    alert("Bhai, Name aur Price toh daal do!");
-    return;
-  }
 
-  // Pehle jaisa simple logic, bina extra String conversion ke
+  // 🚨 AGAR ID NULL HAI TOH AGAY MAT BADHO
+  if (!currentBizId || currentBizId === "null" || currentBizId === null) {
+    alert("Bhai, Business ID missing hai! Ek baar Logout karke Login karo.");
+    return;
+}
+
+  // ✅ 2. Data structure ko backend ke hisaab se set karo
   const productData = {
-    business_id: currentBizId, // Direct use karo jaisa storage mein hai
+    business_id: String(currentBizId), // String mein convert karna safe hai
     name: newProduct.name,
-    price: parseFloat(newProduct.price),
+    price: parseFloat(newProduct.price) || 0,
     description: newProduct.description || "No description",
+    image_url: newProduct.image_url || "",
     category: "General",
-    stock_quantity: 0
+    stock_quantity: parseInt(newProduct.stock_quantity) || 0
   };
+
+  console.log("🚀 Sending Product:", productData);
 
   fetch("http://127.0.0.1:8000/products", {
     method: "POST",
     headers: { 
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}` 
+      "Authorization": `Bearer ${currentToken}` 
     },
     body: JSON.stringify(productData)
   })
   .then(async (res) => {
-    const data = await res.json();
-    if (!res.ok) {
-      // Yahan alert mein error ko dhyan se padhna ki wo kya maang raha hai
-      alert("Backend Error: " + JSON.stringify(data.detail));
-      return;
+    if (res.ok) {
+      alert("Product Add ho gaya! 🔥");
+      // Form reset
+      setNewProduct({ name: "", price: "", description: "", stock_quantity: 0, image_url: "" });
+      // ✅ 3. List Refresh
+      fetchProducts(); 
+    } else {
+      const err = await res.json();
+      console.error("Backend Error Details:", err.detail);
+      alert("Error: " + JSON.stringify(err.detail));
     }
-    setNewProduct({ name: "", price: "", description: "" });
-    fetchProducts();
-    alert("Product Add ho gaya! 🔥");
   })
   .catch(err => alert("Connection Failed!"));
 };
+  
+  const handleEditClick = (product) => {
+    console.log("✏️ Editing Product:", product); 
+    
+    // 1. Sabse important: React ko batao kaunsa product edit ho raha hai
+    // Isi se button "Save Changes" banega
+    setEditingProduct(product); 
+    
+    // 2. Form mein purana data bhar do
+    setNewProduct({
+      id: product.id, 
+      name: product.name,
+      price: product.price,
+      description: product.description,
+      stock_quantity: product.stock_quantity,
+      image_url: product.image_url
+    });
 
+    // 3. Inventory page par jump karo
+    setPage("products"); 
+  };
+
+  const updateProduct = () => {
+  const currentToken = localStorage.getItem("token");
+  const currentBizId = localStorage.getItem("business_id");
+
+  // Hum handleEditClick mein 'editingProduct' set karenge
+  if (!editingProduct) return;
+
+  const productData = {
+    business_id: String(currentBizId),
+    name: newProduct.name,
+    price: parseFloat(newProduct.price) || 0,
+    description: newProduct.description || "No description",
+    image_url: newProduct.image_url || "",
+    category: "General",
+    stock_quantity: parseInt(newProduct.stock_quantity) || 0
+  };
+
+  fetch(`http://127.0.0.1:8000/products/${editingProduct.id}`, {
+    method: "PUT", // 👈 Naya banane ki jagah 'Update' karega
+    headers: { 
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${currentToken}` 
+    },
+    body: JSON.stringify(productData)
+  })
+  .then(res => {
+    if (res.ok) {
+      alert("Product Update ho gaya! ✨");
+      setEditingProduct(null); // Reset edit state
+      setNewProduct({ name: "", price: "", description: "", stock_quantity: 0, image_url: "" });
+      fetchProducts(); // List refresh karo
+    }
+  })
+  .catch(err => alert("Update Fail ho gaya!"));
+};
   const deleteProduct = (id) => {
     if (!window.confirm("Bhai, kya aap is product ko delete karna chahte hain?")) return;
 
@@ -274,159 +380,251 @@ const loadChatHistory = (phone) => {
 
   // --- SUB-COMPONENTS (RETAINING OLD PREMIUM DESIGN) ---
   const DashboardOverview = () => (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-10">
-      <h2 className="text-4xl font-bold gradient-text tracking-tight">Overview</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <DashboardStat icon={Users} label="Total Leads" value={totalLeads} color="from-indigo-500 to-purple-500" />
-        <DashboardStat icon={Flame} label="Conversions (Hot)" value={hotLeadsCount} color="from-orange-500 to-red-500" />
-        <DashboardStat icon={TrendingUp} label="Est. Revenue" value={`₹${estimatedRevenue.toFixed(0)}`} color="from-green-500 to-emerald-500" />
-      </div>
+  <motion.div 
+    initial={{ opacity: 0, y: 10 }} 
+    animate={{ opacity: 1, y: 0 }} 
+    className="space-y-8"
+  >
+    {/* Header Section */}
+    <div>
+      <h2 className="text-3xl font-bold tracking-tight italic text-white/90">Nexora Intelligence Center</h2>
+      <p className="text-gray-500 text-sm mt-1">Real-time performance of your AI autonomous workflows.</p>
+    </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-10">
-        <div className="glass-card p-6 border-white/5">
-          <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-            <BarChart3 className="text-indigo-400" /> Automation Funnel
-          </h3>
-          <div className="space-y-6">
-            <FunnelBar label="Total Messages" value={totalLeads * 4} percent={100} color="bg-indigo-500" />
-            <FunnelBar label="Product Inquiries" value={totalLeads} percent={68} color="bg-blue-400" />
-            <FunnelBar label="AI Hot Leads" value={hotLeadsCount} percent={25} color="bg-green-500" />
-          </div>
-        </div>
+    {/* 3 Stats Cards (SS1 Style) */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <StatCard 
+        icon={<div className="p-2 bg-green-500/10 rounded-lg text-green-500"><ShoppingBag size={20} /></div>}
+        label="Total Revenue Saved" 
+        value="₹42,850" 
+        growth="+12.5% ↗"
+      />
+      <StatCard 
+        icon={<div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400"><MessageSquare size={20} /></div>}
+        label="AI Conversations" 
+        value="1,284" 
+        growth="+18.2% ↗"
+      />
+      <StatCard 
+        icon={<div className="p-2 bg-purple-500/10 rounded-lg text-purple-400"><Users size={20} /></div>}
+        label="Recovered Leads" 
+        value="156" 
+        growth="+5.4% ↗"
+      />
+    </div>
+
+    {/* Live AI Activity Section */}
+    <div className="bg-[#0A0A0A] border border-white/5 rounded-3xl p-8 shadow-2xl">
+      <h3 className="text-lg font-bold flex items-center gap-2 mb-8">
+        <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>
+        Live AI Activity
+      </h3>
+      
+      <div className="space-y-8">
+        <ActivityItem 
+          num="01" 
+          title="Cross-Platform Memory Triggered" 
+          desc="User Vedant added 'Blue Sneakers' to cart on Website. AI sent a WhatsApp follow-up with 5% discount."
+          status="SUCCESS • 2M AGO"
+          color="text-indigo-400"
+        />
+        <ActivityItem 
+          num="02" 
+          title="Shadow Mode: New Pattern Learned" 
+          desc="AI learned how you handle 'Bulk Order' queries from a live chat. Knowledge base updated."
+          status="LEARNED • 15M AGO"
+          color="text-purple-400"
+        />
+        <ActivityItem 
+          num="03" 
+          title="Visual Matcher: Product Identified" 
+          desc="User sent a photo on WhatsApp. AI identified Model-X Part from Website Gallery."
+          status="MATCHED • 1H AGO"
+          color="text-green-500"
+        />
       </div>
-    </motion.div>
-  );
+    </div>
+  </motion.div>
+);
+
+
+// --- Small Helper Components (Inhe Overview ke upar ya niche paste kar dena) ---
+const StatCard = ({ icon, label, value, growth }) => (
+  <div className="bg-[#0A0A0A] border border-white/5 p-6 rounded-3xl relative overflow-hidden group">
+    <div className="flex justify-between items-start mb-4">
+      {icon}
+      <span className="text-[10px] font-bold text-green-500 bg-green-500/10 px-2 py-1 rounded-full uppercase tracking-tighter">
+        {growth}
+      </span>
+    </div>
+    <p className="text-xs text-gray-500 font-medium uppercase tracking-wider mb-1">{label}</p>
+    <h3 className="text-2xl font-bold tracking-tight text-white/90">{value}</h3>
+  </div>
+);
+
+const ActivityItem = ({ num, title, desc, status, color }) => (
+  <div className="flex gap-4 group">
+    <div className={`w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[10px] font-bold ${color} shrink-0`}>
+      {num}
+    </div>
+    <div>
+      <h4 className="text-sm font-bold text-white/90">{title}</h4>
+      <p className="text-xs text-gray-500 mt-1 leading-relaxed">{desc}</p>
+      <p className={`text-[10px] font-black uppercase tracking-widest mt-2 ${color} opacity-80`}>{status}</p>
+    </div>
+  </div>
+);
 
   return (
-    <div className="flex h-screen bg-gray-950 text-white relative overflow-hidden font-sans">
-      {/* Background Ambient Glows */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/10 blur-[120px] rounded-full" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full" />
-
-      {/* ======================== SIDEBAR (Old Visual Consistency) ======================== */}
-      <motion.div 
-        animate={{ width: sidebarCollapsed ? 84 : 260 }} 
-        onMouseEnter={() => setSidebarCollapsed(false)} 
-        onMouseLeave={() => setSidebarCollapsed(true)} 
-        className="m-4 glass-card relative z-50 flex flex-col transition-all duration-300 ease-in-out border-white/10"
-      >
-        <div className="p-4 flex flex-col h-full items-center">
-          {/* Logo Section */}
-          <div className={`mt-2 mb-12 flex items-center ${sidebarCollapsed ? "justify-center" : "gap-4 px-4 w-full"}`}>
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-cyan-500 flex items-center justify-center font-bold text-xl text-white shadow-[0_0_20px_rgba(79,70,229,0.3)] shrink-0">N</div>
-            {!sidebarCollapsed && (
-              <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
-                <h1 className="text-xl font-bold gradient-text tracking-tight">Nexora AI</h1>
-                <div className="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Enterprise</div>
-              </motion.div>
-            )}
+    <div className="flex h-screen bg-[#050505] text-white font-sans overflow-hidden">
+      
+      {/* 🟢 SIDEBAR (Exact SS2 Style) */}
+      <aside className="w-64 border-r border-white/5 bg-[#0A0A0A] flex flex-col z-50">
+        <div className="p-6 flex items-center gap-3">
+          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(79,70,229,0.3)]">
+            <span className="text-xl font-bold italic text-white">N</span>
           </div>
+          <span className="text-lg font-bold tracking-tight italic">Nexora AI</span>
+        </div>
 
-          {/* Nav Items */}
-          <nav className="flex-1 w-full space-y-3 px-3">
-            <SidebarNavItem icon={LayoutDashboard} label="Dashboard" active={page === "dashboard"} onClick={() => setPage("dashboard")} collapsed={sidebarCollapsed} />
-            <SidebarNavItem icon={Users} label="Leads" active={page === "leads"} onClick={() => setPage("leads")} collapsed={sidebarCollapsed} />
-            <SidebarNavItem icon={Package} label="Products" active={page === "products"} onClick={() => setPage("products")} collapsed={sidebarCollapsed} />
-            <SidebarNavItem icon={MessageSquare} label="Live Chat" active={page === "chat"} onClick={() => setPage("chat")} collapsed={sidebarCollapsed} />
-            <SidebarNavItem icon={BarChart3} label="Analytics" active={page === "analytics"} onClick={() => setPage("analytics")} collapsed={sidebarCollapsed} />
-            <SidebarNavItem icon={CreditCard} label="Pricing" active={page === "pricing"} onClick={() => setPage("pricing")} collapsed={sidebarCollapsed} />
-          </nav>
-
-          {/* Bottom Settings & Profile */}
-          <div className="mt-auto pt-6 border-t border-white/5 space-y-3 w-full px-3">
-            <SidebarNavItem icon={Settings} label="Settings" active={page === "settings"} onClick={() => setPage("settings")} collapsed={sidebarCollapsed} />
-            
-            <div onClick={() => setProfileOpen(true)} className={`relative flex items-center ${sidebarCollapsed ? "justify-center" : "px-4"} py-3 rounded-2xl cursor-pointer hover:bg-white/5 transition-all group`}>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-cyan-500 flex items-center justify-center font-bold text-sm shadow-md shrink-0">
-                {me?.name?.charAt(0) || "V"}
-              </div>
-              {!sidebarCollapsed && (
-                <div className="ml-3 truncate">
-                  <p className="text-sm font-semibold truncate">{me?.name || "User"}</p>
-                  <p className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">Profile</p>
-                </div>
-              )}
+        <nav className="flex-1 px-4 py-4 space-y-2">
+          {[
+            { id: 'dashboard', name: 'Overview', icon: <LayoutDashboard size={20} /> },
+            { id: 'strategy', name: 'AI Strategy', icon: <Zap size={20} /> },
+            { id: 'chat', name: 'Conversations', icon: <MessageSquare size={20} /> },
+            { id: 'products', name: 'Inventory', icon: <Package size={20} /> },
+            { id: 'settings', name: 'Settings', icon: <Settings size={20} /> },
+          ].map((item) => (
+            <div
+              key={item.id}
+              onClick={() => setPage(item.id)}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                page === item.id 
+                ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-600/20' 
+                : 'text-gray-500 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              {item.icon}
+              <span className="text-sm font-semibold">{item.name}</span>
             </div>
+          ))}
+        </nav>
 
-            <div onClick={() => { localStorage.clear(); window.location.href = "/login"; }} className={`relative flex items-center ${sidebarCollapsed ? "justify-center" : "px-4"} py-3 rounded-2xl cursor-pointer text-red-400 hover:bg-red-500/10 transition-all group`}>
-              <LogOut size={20} className="shrink-0 group-hover:rotate-12 transition-transform" />
-              {!sidebarCollapsed && <span className="ml-3 font-medium text-sm">Logout</span>}
-            </div>
+        <div className="p-4 border-t border-white/5">
+          <div 
+            onClick={() => { localStorage.clear(); window.location.href = "/login"; }}
+            className="flex items-center gap-3 px-4 py-3 text-gray-500 hover:text-red-400 cursor-pointer transition-colors"
+          >
+            <LogOut size={20} />
+            <span className="text-sm font-semibold">Logout</span>
           </div>
         </div>
-      </motion.div>
+      </aside>
 
-      {/* ======================== MAIN CONTENT ======================== */}
-      <main className="flex-1 overflow-auto p-8 relative z-10 custom-scrollbar">
-        <AnimatePresence mode="wait">
-          {page === "dashboard" && <DashboardOverview />}
-          {/* DashboardMain.jsx mein jahan Leads render ho raha hai */}
-          {page === "leads" && (
-            <Leads 
-              leads={Array.isArray(leads) ? leads : []} // 👈 Pakka karo ki hamesha array hi jaye
-              badgeColor={badgeColor || ((type) => "bg-gray-500/20")} // Default function agar missing ho
-              loadChatHistory={loadChatHistory} 
-            />
-          )}
-          {page === "chat" && (
-              <LiveChat 
-                  chatMessages={chatMessages} 
-                  chatInput={chatInput} 
-                  setChatInput={setChatInput} 
-                  sendChatMessage={sendChatMessage} 
-                  chatLoading={chatLoading}
-                  chatEndRef={chatEndRef} // 👈 Ye prop pass karo
-              />
-          )}
-          {/* DashboardMain.jsx mein niche jahan Products render ho raha hai */}
-          {page === "products" && (
-            <Products 
-              products={products} 
-              newProduct={newProduct} 
-              setNewProduct={setNewProduct} 
-              createProduct={createProduct} // 👈 Ye line check kar, ye honi chahiye!
-              deleteProduct={deleteProduct} 
-            />
-          )}
-          {/* Purana galat code: userEmail is not defined */}
-          {/* DashboardMain.jsx mein line 350 ke aaspass */}
-          {page === "pricing" && (
-            <Pricing 
-              subscribe={handleSubscription} // 👈 Pakka karo ki prop ka naam 'subscribe' hi ho
-            />
-          )}
-          {page === "settings" && <SettingsUI bizId={BIZ_ID} token={token} />}
-          {page === "analytics" && <Analytics />}
-          {page === "billing" && <Billing />}
-        </AnimatePresence>
+      {/* 🔵 MAIN CONTENT AREA (Top Profile & Dark Background) */}
+      <main className="flex-1 flex flex-col overflow-y-auto bg-[#050505]">
+        <header className="h-16 border-b border-white/5 bg-[#0A0A0A]/50 backdrop-blur-md flex items-center justify-between px-8 sticky top-0 z-10">
+          <h2 className="text-xl font-bold tracking-tight italic capitalize">
+            {page === "dashboard" ? "Overview" : page.replace("-", " ")}
+          </h2>
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-xs text-gray-500 font-medium tracking-tight">Welcome back,</p>
+              <p className="text-sm font-bold tracking-tight">{me?.name || "Vedant Ojha"}</p>
+            </div>
+            {/* ✅ Profile icon top-right mein shift ho gaya */}
+            <div 
+              onClick={() => setProfileOpen(true)}
+              className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 border border-white/10 shadow-lg cursor-pointer"
+            ></div>
+          </div>
+        </header>
+
+        <section className="p-8">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={page}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              {page === "dashboard" && <DashboardOverview />}
+              {page === "strategy" && <AIStrategy />}
+              {page === "leads" && <Leads leads={leads} badgeColor={badgeColor} loadChatHistory={loadChatHistory} />}
+              {page === "products" && <Products products={products} newProduct={newProduct} setNewProduct={setNewProduct} createProduct={createProduct} deleteProduct={deleteProduct} handleEditClick={handleEditClick} updateProduct={updateProduct}/>}
+              {page === "chat" && <LiveChat chatMessages={chatMessages} chatInput={chatInput} setChatInput={setChatInput} sendChatMessage={sendChatMessage} chatLoading={chatLoading} chatEndRef={chatEndRef} />}
+              {page === "analytics" && <Analytics />}
+              {page === "pricing" && <Pricing subscribe={handleSubscription} />}
+              {page === "settings" && <SettingsUI bizId={BIZ_ID} token={token} />}
+            </motion.div>
+          </AnimatePresence>
+        </section>
       </main>
 
-      {/* ======================== PROFILE SLIDE-OVER (Old Design Retained) ======================== */}
+
+      {/* ======================== PROFILE SLIDE-OVER (Nexora Theme) ======================== */}
       <AnimatePresence>
         {profileOpen && (
           <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setProfileOpen(false)} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]" />
-            <motion.div initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} transition={{ type: "spring", damping: 25 }} className="fixed right-0 top-0 h-full w-85 bg-gray-950 border-l border-white/10 z-[101] shadow-2xl flex flex-col">
-              <div className="p-8 bg-gradient-to-b from-indigo-500/10 to-transparent">
-                <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-indigo-500 to-cyan-500 flex items-center justify-center text-3xl font-bold shadow-xl mb-6">
-                  {me?.name?.charAt(0) || "V"}
+            {/* Background Overlay - Glass effect */}
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} 
+              onClick={() => setProfileOpen(false)} 
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100]" 
+            />
+            
+            {/* Side Panel - Nexora Dark Look */}
+            <motion.div 
+              initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }} 
+              transition={{ type: "spring", damping: 25, stiffness: 200 }} 
+              className="fixed right-0 top-0 h-full w-85 bg-[#050505] border-l border-white/5 z-[101] shadow-2xl flex flex-col font-sans"
+            >
+              {/* ❌ Subtle Close Button */}
+              <button 
+                onClick={() => setProfileOpen(false)} 
+                className="absolute top-5 right-5 p-1.5 rounded-lg bg-white/5 text-gray-500 hover:text-white hover:bg-white/10 transition-all z-[102] border border-white/5 group"
+              >
+                <X size={18} className="group-hover:rotate-90 transition-transform duration-300" />
+              </button>
+
+              {/* Header - Indigo Gradient with Dynamic Alphabet */}
+              <div className="p-8 bg-gradient-to-b from-indigo-600/10 to-transparent">
+                {/* Profile Circle Logic */}
+                <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-3xl font-bold text-white uppercase shadow-xl">
+                  {me?.name ? me.name.charAt(0) : (googleUser?.name ? googleUser.name.charAt(0) : "V")}
                 </div>
-                <h2 className="text-2xl font-bold">{me?.name || "Vedant Ojha"}</h2>
-                <p className="text-sm text-indigo-400 font-medium uppercase tracking-widest">Business Owner</p>
+                
+                <h2 className="text-2xl font-bold tracking-tight text-white/90 capitalize">
+                  {me?.name || "Vedant Ojha"}
+                </h2>
+                <p className="text-xs text-indigo-400 font-black uppercase tracking-[3px] mt-1">
+                  Business Owner
+                </p>
               </div>
 
+              {/* Info Boxes - SS1 Style Spacing */}
               <div className="px-8 space-y-5 flex-1 overflow-y-auto">
-                <ProfileInfoBox label="Email Address" value={me?.email || "N/A"} />
-                <ProfileInfoBox label="Active Plan" value={me?.plan || "Starter Free"} highlight />
-                <ProfileInfoBox label="Business ID" value={BIZ_ID} mono />
+                <ProfileInfoBox label="Email Address" value={me?.email || "N/A"} icon={<Mail size={14} />} />
+                <ProfileInfoBox label="Active Plan" value={me?.plan || "Starter Free"} highlight icon={<Zap size={14} />} />
+                <ProfileInfoBox label="Business ID" value={BIZ_ID} mono icon={<ShieldCheck size={14} />} />
               </div>
 
-              <div className="p-8 border-t border-white/5 space-y-3">
-                <button onClick={() => setEditModalOpen(true)} className="w-full py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all text-sm flex items-center gap-3 font-medium">
-                  <Settings size={18} /> Edit Business
+              {/* Bottom Actions - Nexora Dark Style */}
+              <div className="p-8 border-t border-white/5 bg-[#080808] space-y-3">
+                <button 
+                  onClick={() => setEditModalOpen(true)} 
+                  className="w-full py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all text-sm flex items-center gap-3 font-bold border border-white/5 group"
+                >
+                  <Settings size={18} className="group-hover:rotate-45 transition-transform" /> 
+                  Edit Business
                 </button>
-                <button onClick={() => { localStorage.clear(); window.location.href = "/login"; }} className="w-full py-4 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-2xl font-bold transition-all flex items-center justify-center gap-2">
-                  <LogOut size={18} /> Log Out
+                
+                <button 
+                  onClick={() => { localStorage.clear(); window.location.href = "/login"; }} 
+                  className="w-full py-4 bg-red-500/5 hover:bg-red-500/10 text-red-500 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 border border-red-500/10"
+                >
+                  <LogOut size={18} /> 
+                  Log Out
                 </button>
               </div>
             </motion.div>
@@ -434,7 +632,13 @@ const loadChatHistory = (phone) => {
         )}
       </AnimatePresence>
 
-      <EditBusinessModal isOpen={editModalOpen} onClose={() => setEditModalOpen(false)} currentName={me?.name} BIZ_ID={BIZ_ID} token={token} />
+      <EditBusinessModal 
+        isOpen={editModalOpen} 
+        onClose={() => setEditModalOpen(false)} 
+        currentName={me?.name} 
+        BIZ_ID={BIZ_ID} 
+        token={token} 
+      />
     </div>
   );
 }
@@ -506,41 +710,73 @@ const SettingsUI = ({ bizId, token }) => {
   const handleSave = () => {
     fetch("http://127.0.0.1:8000/ai-settings", {
       method: "PUT",
-      headers: { 
-        "Content-Type": "application/json", 
-        "Authorization": `Bearer ${token}` 
-      },
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
       body: JSON.stringify({ 
-        biz_id: String(bizId), // 👈 Biz ID ko string mein convert kiya
-        ai_name: "Nexora AI",   // 👈 Backend ye field maang raha hai
+        biz_id: String(bizId), 
+        ai_name: "Nexora AI", 
         system_prompt: settings.ai_prompt || "You are a helpful assistant." 
       })
     })
     .then(res => {
       if(res.ok) alert("AI Personality Saved! ✨");
-      else alert("Backend validation failed! Check Console.");
-    })
-    .catch(() => alert("Connection error!"));
+      else alert("Backend validation failed!");
+    });
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-4xl space-y-8">
-      <h2 className="text-3xl font-black gradient-text">AI Configuration</h2>
-      <div className="glass-card p-8 space-y-8 border-white/5">
-        <div>
-          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">Tone of Voice</label>
-          <select value={settings.ai_tone} onChange={(e) => setSettings({...settings, ai_tone: e.target.value})} className="w-full mt-3 bg-gray-900 border border-white/10 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/40 text-gray-200 transition-all">
-            <option value="professional">Professional & Direct</option>
-            <option value="friendly">Friendly & Warm</option>
-            <option value="persuasive">Sales-Driven & Persuasive</option>
-            <option value="casual">Casual & Conversational</option>
-          </select>
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-8 max-w-5xl">
+      {/* Header */}
+      <div>
+        <h2 className="text-3xl font-bold tracking-tight italic text-white/90">AI Configuration</h2>
+        <p className="text-gray-500 text-sm mt-1">Define how Nexora AI interacts with your customers.</p>
+      </div>
+
+      {/* Main Settings Card */}
+      <div className="bg-[#0A0A0A] border border-white/5 rounded-3xl p-8 shadow-2xl space-y-10">
+        
+        {/* Tone Selection Block */}
+        <div className="space-y-4">
+          <label className="text-[10px] font-black text-indigo-400 uppercase tracking-[3px]">Tone of Voice</label>
+          <div className="relative group">
+            <select 
+              value={settings.ai_tone} 
+              onChange={(e) => setSettings({...settings, ai_tone: e.target.value})} 
+              // ✅ Nayi Styling: bg-gray-900 aur text-gray-200 force kiya hai
+              className="w-full bg-[#111111] border border-white/10 p-4 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/40 text-sm text-gray-200 transition-all appearance-none cursor-pointer"
+            >
+              {/* ✅ Har option ko alag se dark style diya hai */}
+              <option value="professional" className="bg-[#0A0A0A] text-white">Professional & Direct</option>
+              <option value="friendly" className="bg-[#0A0A0A] text-white">Friendly & Warm</option>
+              <option value="persuasive" className="bg-[#0A0A0A] text-white">Sales-Driven & Persuasive</option>
+              <option value="casual" className="bg-[#0A0A0A] text-white">Casual & Conversational</option>
+            </select>
+            
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-500">
+              <ChevronDown size={18} />
+            </div>
+          </div>
         </div>
-        <div>
-          <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">System Instructions</label>
-          <textarea value={settings.ai_prompt} onChange={(e) => setSettings({...settings, ai_prompt: e.target.value})} className="w-full mt-3 bg-gray-900 border border-white/10 p-5 rounded-2xl h-44 outline-none focus:ring-2 focus:ring-indigo-500/40 text-gray-200 resize-none transition-all" placeholder="Define custom rules (e.g., 'Focus on bulk orders', 'Always mention warranty')..." />
+
+        {/* System Prompt Block */}
+        <div className="space-y-4">
+          <label className="text-[10px] font-black text-purple-400 uppercase tracking-[3px]">System Instructions</label>
+          <textarea 
+            value={settings.ai_prompt} 
+            onChange={(e) => setSettings({...settings, ai_prompt: e.target.value})} 
+            className="w-full bg-white/[0.03] border border-white/10 p-6 rounded-2xl h-56 outline-none focus:ring-2 focus:ring-purple-500/40 text-sm text-gray-200 resize-none transition-all leading-relaxed" 
+            placeholder="Define custom rules (e.g., 'Focus on bulk orders', 'Always mention warranty')..." 
+          />
         </div>
-        <button onClick={handleSave} className="bg-indigo-600 hover:bg-indigo-500 px-10 py-4 rounded-2xl font-bold shadow-xl shadow-indigo-500/20 transition-all hover:scale-[1.02]">Save Personality</button>
+
+        {/* Action Button */}
+        <div className="pt-4">
+          <button 
+            onClick={handleSave} 
+            className="bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-2xl font-bold text-sm shadow-lg shadow-indigo-600/20 transition-all hover:scale-[1.02] active:scale-95"
+          >
+            Save Personality
+          </button>
+        </div>
       </div>
     </motion.div>
   );

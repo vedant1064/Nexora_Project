@@ -36,11 +36,15 @@ body::before {
 html {
   scroll-behavior: smooth;
 }
-.hide-scrollbar::-webkit-scrollbar {
-    display: none; /* Chrome, Safari and Opera */
-}
-.hide-scrollbar {
-    -ms-overflow-style: none;  /* IE and Edge */
-    scrollbar-width: none;  /* Firefox */
-    scroll-behavior: smooth;
+/* ✅ Updated Sidebar Scroll Hide Logic */
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none !important; /* Chrome, Safari, Opera */
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none !important;  /* IE and Edge */
+    scrollbar-width: none !important;  /* Firefox */
+    overflow-y: auto; /* Ensure scrolling is enabled */
+  }
 }

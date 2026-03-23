@@ -1,7 +1,25 @@
 /* Path: src/components/HeroPremium.jsx */
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 export default function HeroPremium() {
+  const navigate = useNavigate(); // ✅ Hook ko initialize karo
+
+  // ✅ Smart Navigation Function
+  const handleStart = () => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      navigate("/dashboard"); // Agar login hai
+    } else {
+      navigate("/login"); // Agar login nahi hai
+    }
+  };
+  const scrollToArchitecture = () => {
+    const element = document.getElementById("technical"); // App.jsx mein ye ID di hui hai
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+    }
+  };
   return (
     <section className="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden">
       <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-12 items-center">
@@ -44,10 +62,16 @@ export default function HeroPremium() {
             transition={{ delay: 0.3 }}
             className="flex flex-wrap gap-4 justify-center lg:justify-start"
           >
-            <button className="px-8 py-4 bg-white text-black rounded-xl font-semibold hover:bg-indigo-50 transition-all shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+            <button 
+              onClick={handleStart} // ✅ Function ko yahan connect karo
+              className="px-8 py-4 bg-white text-black rounded-xl font-semibold hover:bg-indigo-50 transition-all shadow-[0_0_30px_rgba(255,255,255,0.1)]"
+            >
               Unlock Automation
             </button>
-            <button className="px-8 py-4 bg-white/5 border border-white/10 rounded-xl font-semibold hover:bg-white/10 transition-all">
+            <button 
+              onClick={scrollToArchitecture}
+              className="px-8 py-4 bg-white/5 border border-white/10 rounded-xl font-semibold hover:bg-white/10 transition-all"
+            >
               Watch Architecture
             </button>
           </motion.div>

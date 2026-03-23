@@ -1,13 +1,14 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
 // 1. Dashboard & Auth Pages
 import DashboardMain from "./DashboardMain";
 import Login from "./pages/dashboard/Login";
-import Signup from "./pages/dashboard/Signup";
-import ResetPassword from "./pages/dashboard/ResetPassword";
+import Overview from './pages/Dashboard/Overview';
+import AIStrategy from './pages/Dashboard/AIStrategy';
 
-// 2. Landing Page Imports (Aapke saare purane imports)
+// 2. Landing Page Imports
+import DashboardLayout from './components/DashboardLayout'; 
 import Navbar from "./components/Navbar";
 import HeroPremium from "./components/HeroPremium";
 import LogoMarquee from "./components/LogoMarquee";
@@ -25,7 +26,16 @@ import Pricing from "./components/Pricing";
 import SystemUniverse from "./components/SystemUniverse";
 import FinalCTA from "./components/FinalCTA";
 
-// LANDING PAGE COMPONENT (Aapka pura UI yahan safe hai)
+// ✅ Authentication Guard (Simple logic to protect routes)
+const ProtectedRoute = ({ children }) => {
+  const token = localStorage.getItem("token"); // Token check karo
+  if (!token) {
+    return <Navigate to="/login" />; // Agar login nahi hai, toh login page bhej do
+  }
+  return children;
+};
+
+// LANDING PAGE COMPONENT
 const Landing = () => (
   <div className="bg-[#050505] text-white selection:bg-indigo-500/30 overflow-x-hidden">
     <Navbar />
@@ -60,9 +70,21 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/dashboard" element={<DashboardMain />} />
+        <Route path="/signup" element={<Login />} />
+        
+        
+        {/* ✅ Sirf Dashboard ko protect kiya gaya hai */}
+        <Route 
+          path="/dashboard" 
+          element={
+            <ProtectedRoute>
+              <DashboardMain />
+            </ProtectedRoute>
+          } 
+        />
+
+        <Route path="/dashboard" element={<DashboardLayout><Overview /></DashboardLayout>} />
+        <Route path="/dashboard/strategy" element={<DashboardLayout><AIStrategy /></DashboardLayout>} />
       </Routes>
     </Router>
   );

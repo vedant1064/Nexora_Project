@@ -1,13 +1,13 @@
 /* Path: src/components/Navbar.jsx */
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 export default function Navbar() {
+  const navigate = useNavigate();
   // Aapke nexora-ui project ka URL (Vite port 5174)
   const UI_URL = "http://localhost:5174";
 
-  const handleRedirect = (path) => {
-    window.location.href = `${UI_URL}/${path}`;
-  };
+  
 
   return (
     <motion.nav 
@@ -27,21 +27,29 @@ export default function Navbar() {
         
         {/* Center Links (Smooth Scroll for Landing Page) */}
         <div className="hidden md:flex items-center gap-10 text-[11px] font-mono uppercase tracking-[0.2em] text-gray-400">
-          <a href="#art-flow" className="hover:text-white transition-colors">Workspace</a>
+          <button 
+            onClick={() => {
+              const token = localStorage.getItem("token");
+              navigate(token ? "/dashboard" : "/login");
+            }} 
+            className="hover:text-white transition-colors uppercase"
+          >
+            Workspace
+          </button>
           <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
           <a href="#technical" className="hover:text-white transition-colors">Docs</a>
         </div>
 
-        {/* Action Buttons connected to nexora-ui */}
+        {/* Action Buttons */}
         <div className="flex items-center gap-6">
           <button 
-            onClick={() => handleRedirect('login')}
+            onClick={() => navigate('/login')} // ✅ Ab ye 5173 par hi khulega
             className="text-xs font-bold uppercase tracking-widest hover:text-indigo-400 transition-colors"
           >
             Login
           </button>
           <button 
-            onClick={() => handleRedirect('signup')}
+            onClick={() => navigate('/signup')} // ✅ Ab ye bhi 5173 par
             className="bg-white text-black px-6 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest hover:bg-indigo-500 hover:text-white transition-all shadow-lg active:scale-95"
           >
             Sign Up Free

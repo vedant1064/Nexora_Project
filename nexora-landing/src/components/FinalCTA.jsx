@@ -1,11 +1,16 @@
 /* Path: src/components/FinalCTA.jsx */
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 export default function FinalCTA() {
-  const UI_URL = "http://localhost:5174";
-
-  const goToSignup = () => {
-    window.location.href = `${UI_URL}/signup`;
+  const navigate = useNavigate();
+  const handleAction = () => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      navigate("/dashboard"); // Agar login hai toh dashboard
+    } else {
+      navigate("/signup"); // Agar nahi hai toh signup
+    }
   };
 
   return (
@@ -30,11 +35,11 @@ export default function FinalCTA() {
 
         <div className="flex flex-col md:flex-row items-center justify-center gap-4">
           <button 
-            onClick={goToSignup}
-            className="bg-black text-white px-10 py-5 rounded-2xl font-bold text-lg hover:bg-gray-900 transition-all shadow-2xl active:scale-95"
-          >
-            Create Free Account
-          </button>
+          onClick={handleAction} 
+          className="bg-black text-white px-10 py-5 rounded-2xl font-bold text-lg hover:bg-gray-900 transition-all shadow-2xl active:scale-95"
+        >
+          Create Free Account
+        </button>
           <button 
             onClick={() => window.location.href = "mailto:support@nexora.ai"}
             className="bg-white/10 backdrop-blur-md border border-white/20 text-white px-10 py-5 rounded-2xl font-bold text-lg hover:bg-white/20 transition-all"
