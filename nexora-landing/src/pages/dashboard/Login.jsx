@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useGoogleLogin, useGoogleOneTapLogin } from '@react-oauth/google';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom'; // 👈 1. Import useNavigate
 
 export default function Login() {
   const [isLogoSet, setIsLogoSet] = useState(false);
+  const navigate = useNavigate(); // 👈 2. Initialize hook
 
   useGoogleOneTapLogin({
     onSuccess: (res) => {
       localStorage.setItem("token", res.credential);
-      window.location.href = "/dashboard";
+      navigate("/"); // 👈 3. Dashboard ki jagah Landing par bhejo
     },
   });
 
   const loginWithGoogle = useGoogleLogin({
     onSuccess: async (res) => {
       try {
-        // 1. Google token ko backend par bhejo login verify karne ke liye
         const response = await fetch("http://127.0.0.1:8000/google-login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -25,12 +26,11 @@ export default function Login() {
         const data = await response.json();
 
         if (data.business_id) {
-          // 2. ✅ AB SAHI SE SAVE KARO
           localStorage.setItem("token", data.token || res.access_token);
           localStorage.setItem("business_id", data.business_id);
           
-          // 3. Phir dashboard par bhejo
-          window.location.href = "/dashboard";
+          // ✅ 4. Final Redirect Change
+          navigate("/"); // Dashboard se hatakar Home par
         } else {
           alert("Login failed: Business ID not returned from backend");
         }

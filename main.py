@@ -18,9 +18,8 @@ import jwt
 
 from psycopg2.extras import RealDictCursor
 from datetime import datetime, timedelta, timezone
-from google import genai
-from google.genai import types
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig
+from typing import Optional
 
 
 # =========================================
@@ -33,9 +32,6 @@ from pathlib import Path
 env_path = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=env_path, override=True)
 
-print("ENV PATH:", env_path)
-print("EMAIL:", repr(os.getenv("EMAIL")))
-print("EMAIL_PASSWORD:", repr(os.getenv("EMAIL_PASSWORD")))
 
 app = FastAPI()
 
@@ -63,9 +59,10 @@ RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
 
 razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
-# Purana openai_client hata kar ye likho:
-gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
+from google import genai
+
+client = genai.Client(api_key="AIzaSyCfL0PmfdG2F45SJ-AP2B9rO6sHVyltOco")
 # EMAIL CONFIG (PASTE HERE)
 mail_conf = ConnectionConfig(
     MAIL_USERNAME=os.getenv("EMAIL"),
@@ -330,19 +327,92 @@ async def razorpay_webhook(request: Request):
 
     return {"status": "ok"}
 
+# =========================================
+# 📞 WHATSAPP WEBHOOK VERIFICATION (GET)
+# =========================================
+@app.get("/whatsapp-webhook")
+async def verify_webhook(request: Request):
+    params = request.query_params
+    # 🚨 'nexora_secret_123' ko Meta Portal ke 'Verify Token' mein bhi yahi likhna
+    if params.get("hub.verify_token") == "nexora_secret_123":
+        from fastapi.responses import Response
+        # Meta ko 'challenge' wapas bhejna zaroori hai
+        return Response(content=params.get("hub.challenge"), media_type="text/plain")
+    
+    print("❌ Webhook Verification Failed: Token Mismatch")
+    return {"error": "Invalid verification token"}
+
+import uuid 
+
+class PaymentVerifyRequest(BaseModel):
+    razorpay_payment_id: str
+    razorpay_order_id: str  # Ab ye frontend se real aayega
+    razorpay_signature: str # Ab ye frontend se real aayega
+    plan_name: str
+    business_id: str
+
+@app.post("/verify-payment")
+async def verify_payment(data: PaymentVerifyRequest):
+    # 🔐 ASLI SECURITY: Razorpay Signature Check
+    try:
+        # Ye verify karta hai ki payment sach mein Razorpay se hui hai
+        razorpay_client.utility.verify_payment_signature({
+            'razorpay_order_id': data.razorpay_order_id,
+            'razorpay_payment_id': data.razorpay_payment_id,
+            'razorpay_signature': data.razorpay_signature
+        })
+    except Exception as e:
+        print(f"❌ Signature Verification Failed: {e}")
+        raise HTTPException(status_code=400, detail="Invalid Payment Signature")
+
+    # 1️⃣ Step: Naya Token Generate Karo (Jo purana 'null' tha wo hat jayega)
+    unique_suffix = str(uuid.uuid4())[:8]
+    timestamp = int(datetime.now(timezone.utc).timestamp())
+    new_whatsapp_token = f"NEX_{data.business_id[:4]}_{unique_suffix}_{timestamp}"
+
+    # 2️⃣ Step: Database Update
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            UPDATE businesses 
+            SET subscription_status = 'active',
+                plan_tier = %s,
+                whatsapp_token = %s,
+                subscription_end_date = NOW() + INTERVAL '30 days'
+            WHERE id = %s
+        """, (data.plan_name.upper(), new_whatsapp_token, data.business_id))
+        
+        conn.commit()
+        print(f"✅ Subscription Activated for Biz: {data.business_id}")
+        return {
+            "status": "success",
+            "new_token": new_whatsapp_token
+        }
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cur.close()
+        conn.close()
+
 @app.post("/google-login")
 async def google_login(data: dict):
-    # 1. Frontend se token mil raha hai
-    token = data.get("token")
+    # 🚨 Dummy ID hata kar ab asli logic chalega
+    email = data.get("email") # Frontend se email aayega
     
-    # 2. Testing ke liye hum database se ek real Business ID bhej rahe hain
-    # 🚨 APNE DATABASE (PostgreSQL) SE EK REAL UUID COPY KARKE YAHAN DALO
-    # Example: "89bd6033-xxxx-xxxx-xxxx"
-    
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur.execute("SELECT business_id FROM users WHERE email=%s", (email,))
+    user = cur.fetchone()
+    conn.close()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found. Please register.")
+
     return {
         "status": "success",
-        "token": token,
-        "business_id": "622bb52f-af29-4615-874f-ac49b3328b6c" # 👈 TERI REAL ID YAHAN AYEYGI
+        "business_id": user["business_id"] # Asli ID return hogi
     }
 
 # =========================================
@@ -392,49 +462,45 @@ def whatsapp_webhook(data: WhatsAppMessage, user = Depends(verify_token)):
         history_text = "\n".join(history_lines) if history_lines else ""
 
         # 5. Smart System Prompt - Catalog sirf tabhi dikhao jab zaroorat ho
-        system_prompt = f"""You are a smart, friendly sales agent for {biz_name}.
-Tone: {ai_tone}
+        system_prompt = f"""You are an expert sales agent for {biz_name}. 
+        Tone: {ai_tone}
 
-STRICT RULES:
-1. Detect the customer's language automatically and ALWAYS reply in THAT SAME language.
-2. Answer the customer's SPECIFIC question directly. Do NOT give generic responses.
-3. ONLY show product catalog/prices when customer EXPLICITLY asks about: products, price, catalog, buy, order, kya milta hai, kya hai, etc.
-4. For greetings (Hi, Hello, Namaste, Hii, Hey) - just greet back warmly and ask how you can help. DO NOT show catalog.
-5. For complaints or issues - empathize and help solve the problem.
-6. For pricing queries - show relevant products from catalog.
-7. Keep responses SHORT and conversational (2-4 lines max unless showing catalog).
-8. Never repeat the same response. Always respond to what the customer JUST said.
+        STRICT INSTRUCTIONS:
+        1. NEVER say "I am repeating" or "As mentioned before". Always provide a fresh, helpful response.
+        2. If the customer repeats a question, explain it using different words or examples.
+        3. Use the conversation history below ONLY to understand context, NOT to copy previous answers.
+        4. Reply in the SAME language the customer is using.
 
-CATALOG (only use when asked):
-{catalog_text}
+        CATALOG:
+        {catalog_text}
 
-CONVERSATION SO FAR:
-{history_text}"""
+        HISTORY (For Context Only):
+        {history_text}"""
 
         # 6. Current customer message
         prompt = f"{system_prompt}\n\nCustomer: {data.message}\nSales Agent:"
 
-        # 7. Gemini API Call
+        
+        
+        
+        # 🤖 Gemini API Call (Official SDK Format)
         try:
-            response = gemini_client.models.generate_content(
-                model="gemini-2.0-flash-lite",
-                contents=prompt
-            )
+            # 🚨 Model name ke aage 'models/' mat lagao
+            response = client.models.generate_content(
+                model="gemini-3-flash-preview",
+                contents=[{
+            "role": "user",
+            "parts": [{"text": prompt}]
+        }])
             
-            if (response.candidates and 
-                len(response.candidates) > 0 and 
-                response.candidates[0].content.parts):
+            if response.text:
                 reply = response.text.strip()
-                # Remove "Sales Agent:" prefix agar Gemini ne add kar diya
-                if reply.startswith("Sales Agent:"):
-                    reply = reply.replace("Sales Agent:", "").strip()
             else:
-                print(f"⚠️ Gemini empty response, finish_reason: {response.candidates[0].finish_reason if response.candidates else 'unknown'}")
-                reply = f"Hello! I'm from {biz_name}. How can I help you today?"
+                reply = "Main aapki kya madad kar sakta hoon?"
                 
         except Exception as gem_e:
-            print(f"❌ Gemini API Error: {gem_e}")
-            reply = f"Sorry, I'm having a small issue. Please try again in a moment!"
+            print(f"❌ Gemini Error: {str(gem_e)}")
+            reply = "Main abhi thoda busy hoon..."
 
         # 8. Save conversation history
         cur.execute("""

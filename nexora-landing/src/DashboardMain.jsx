@@ -115,7 +115,21 @@ const handleSubscription = (planKey) => {
     ? products.reduce((acc, p) => acc + (p.price || 0), 0) / products.length 
     : 500;
   const estimatedRevenue = hotLeadsCount * avgPrice;
+  const [stats, setStats] = useState({
+    total_messages: 0,
+    total_leads: 0,
+    hot_leads: 0,
+    products: 0
+  });
 
+  const fetchAnalytics = () => {
+    fetch(`http://127.0.0.1:8000/analytics/${BIZ_ID}`, { 
+      headers: { Authorization: `Bearer ${token}` } 
+    })
+    .then(res => res.json())
+    .then(data => setStats(data))
+    .catch(err => console.error("Analytics error:", err));
+  };
   // --- CORE DATA FETCHING ---
   useEffect(() => {
     if (!BIZ_ID || !token) return;
@@ -132,13 +146,8 @@ const handleSubscription = (planKey) => {
       }
     })
     .catch(err => console.error("Me fetch error:", err));
-    
-    const refreshData = () => { fetchLeads(); fetchProducts(); };
-    refreshData();
-    const interval = setInterval(refreshData, 30000);
-    return () => clearInterval(interval);
   }, [BIZ_ID, token]);
-
+   
   const fetchLeads = () => {
     const currentId = localStorage.getItem("business_id");
     const currentToken = localStorage.getItem("token");
@@ -493,6 +502,8 @@ const ActivityItem = ({ num, title, desc, status, color }) => (
             { id: 'strategy', name: 'AI Strategy', icon: <Zap size={20} /> },
             { id: 'chat', name: 'Conversations', icon: <MessageSquare size={20} /> },
             { id: 'products', name: 'Inventory', icon: <Package size={20} /> },
+            { id: 'leads', name: 'Recent Leads', icon: <Users size={20} /> }, // 👈 Leads tab wapas add kiya
+            { id: 'analytics', name: 'Analytics', icon: <BarChart3 size={20} /> },
             { id: 'settings', name: 'Settings', icon: <Settings size={20} /> },
           ].map((item) => (
             <div

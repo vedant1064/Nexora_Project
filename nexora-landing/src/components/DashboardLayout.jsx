@@ -9,12 +9,18 @@ export default function DashboardLayout({ children }) {
   const [isReady, setIsReady] = useState(false);
 
   // 🛡️ AUTH CHECK: Bina token ke koi andar nahi aayega
+  // DashboardLayout.jsx mein line 11 ke aas-paas replace karein
   useEffect(() => {
     const token = localStorage.getItem("token");
+    const isPaid = localStorage.getItem("subscription_status") === "active"; 
+
     if (!token) {
       navigate("/login");
+    } else if (!isPaid) {
+      // Agar login hai par payment nahi ki, toh pricing section par bhejo
+      navigate("/#pricing"); 
     } else {
-      setIsReady(true); // Jab token mil jaye tabhi content dikhao
+      setIsReady(true);
     }
   }, [navigate]);
 

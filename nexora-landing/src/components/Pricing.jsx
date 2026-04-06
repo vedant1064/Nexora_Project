@@ -1,43 +1,124 @@
 /* Path: src/components/Pricing.jsx */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 export default function Pricing() {
   const [billingCycle, setBillingCycle] = useState("monthly");
+  const navigate = useNavigate();
+
+  // 🛠️ STEP 1: Razorpay SDK load karna
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    document.body.appendChild(script);
+  }, []);
 
   const plans = [
     { 
       name: "Starter", 
-      monthly: "299", 
-      yearly: "2999", 
+      monthly: 299, // Number format for calculation
+      yearly: 2999, 
       features: ["1000 Messages/mo", "Basic OpenAI", "Razorpay Secure"],
       color: "border-gray-300" 
     },
     { 
       name: "Pro", 
-      monthly: "499", 
-      yearly: "4999", 
+      monthly: 499, 
+      yearly: 4999, 
       features: ["Unlimited Messages", "FastAPI Hooks", "Neural Memory"],
       highlight: true,
       color: "border-indigo-600" 
     },
     { 
       name: "Premium", 
-      monthly: "999", 
-      yearly: "9999", 
+      monthly: 999, 
+      yearly: 9999, 
       features: ["Custom AI Agents", "Priority Execution", "Enterprise API"],
       color: "border-black" 
     }
   ];
 
+  // 🛠️ STEP 2: Payment Handling Logic
+  const handlePayment = (plan) => {
+    // ⚡ Pehle ye verify karo ki click kaam kar raha hai
+    console.log("Plan Clicked:", plan.name);
+
+    // 🛠️ DIRECT KEY DALO (Environment variables ko abhi bypass karo)
+    const MY_RAZORPAY_KEY = "rzp_test_SYsoP7hL5xbJ0n";
+
+    const options = {
+      key: MY_RAZORPAY_KEY, 
+      amount: (billingCycle === 'monthly' ? plan.monthly : plan.yearly) * 100,
+      currency: "INR",
+      name: "Nexora AI",
+      description: `${plan.name} Subscription`,
+      handler: function (response) {
+        verifyPayment(response, plan);
+      },
+      prefill: {
+        email: "test@nexora.ai",
+      },
+      theme: { color: "#6366f1" },
+    };
+
+    try {
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      console.error("Razorpay Trigger Error:", err);
+    }
+  };
+
+    // 🛠️ STEP 3: Payment Verification (Backend Sync)
+    const verifyPayment = async (paymentDetails, plan) => {
+  try {
+    const token = localStorage.getItem("token");
+
+    const response = await fetch("http://127.0.0.1:8000/verify-payment", {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        // 🚨 Keys ke naam backend model se match hone chahiye
+        razorpay_payment_id: paymentDetails.razorpay_payment_id || "test_pay_id",
+        razorpay_order_id: paymentDetails.razorpay_order_id || "test_order_id",
+        razorpay_signature: paymentDetails.razorpay_signature || "test_sig",
+        plan_name: plan.name,
+        business_id: localStorage.getItem("business_id") || "622bb52f-af29-4615-874f-ac49b3328b6c" 
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      // 🔑 NAYA TOKEN: Purana wala invalidate karke naya save karo
+      localStorage.setItem("whatsapp_access_token", data.new_token); 
+      localStorage.setItem("subscription_status", "active");
+      
+      alert("Payment Verified! Your new automation token is active.");
+      navigate("/dashboard");
+    } else {
+      // Agar backend bole ki signature match nahi hua
+      alert(`Verification failed: ${data.detail || "Unknown Error"}`);
+    }
+  } catch (err) {
+    console.error("Verification Error:", err);
+    alert("Server connection error during verification.");
+  }
+};
+
   return (
-    <section id="pricing" className="py-40 bg-[#f6f6f3] border-t border-gray-200">
+    /* Pricing.jsx mein return ke andar pehla tag update karo */
+    <section id="pricing" className="relative py-40 bg-[#f6f6f3] border-t border-gray-200 z-10">
       <div className="max-w-7xl mx-auto px-6">
         
         <div className="text-center mb-16">
           <h2 className="text-6xl font-black text-black tracking-tighter mb-6">Ready to <span className="text-indigo-600 italic font-serif">scale?</span></h2>
           
-          {/* Custom Toggle for Razorpay Cycles */}
           <div className="flex items-center justify-center gap-4 mt-8">
             <span className={`text-sm font-bold ${billingCycle === 'monthly' ? 'text-black' : 'text-gray-400'}`}>Monthly</span>
             <button 
@@ -76,7 +157,17 @@ export default function Pricing() {
                 </ul>
               </div>
 
-              <button className={`mt-12 w-full py-5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 ${plan.highlight ? 'bg-indigo-600 text-white shadow-xl' : 'bg-black text-white hover:bg-gray-800'}`}>
+              {/* 🛠️ STEP 4: handlePayment Function Connect Karo */}
+              /* Plans map ke andar button update karo */
+              <button 
+                onClick={(e) => {
+                  e.preventDefault(); // Kisi bhi unwanted behavior ko rokne ke liye
+                  handlePayment(plan);
+                }}
+                className={`relative z-20 mt-12 w-full py-5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 ${
+                  plan.highlight ? 'bg-indigo-600 text-white shadow-xl' : 'bg-black text-white hover:bg-gray-800'
+                }`}
+              >
                 Pay via Razorpay
               </button>
 
