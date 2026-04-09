@@ -8,6 +8,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from pathlib import Path
+
 import os
 import psycopg2
 import razorpay
@@ -59,15 +61,18 @@ RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
 
 razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
+PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID")
+BUSINESS_ACCOUNT_ID = os.getenv("BUSINESS_ACCOUNT_ID")
 
 from google import genai
 
-client = genai.Client(api_key="AIzaSyCfL0PmfdG2F45SJ-AP2B9rO6sHVyltOco")
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 # EMAIL CONFIG (PASTE HERE)
 mail_conf = ConnectionConfig(
-    MAIL_USERNAME=os.getenv("EMAIL"),
-    MAIL_PASSWORD=os.getenv("EMAIL_PASSWORD"),
-    MAIL_FROM=os.getenv("EMAIL"),
+    MAIL_USERNAME="vedantojha22@gmail.com", # Apna email yahan likh do
+    MAIL_PASSWORD="Hello@021",         # Abhi ke liye kuch bhi likh do
+    MAIL_FROM="vedantojha22@gmail.com",
     MAIL_PORT=587,
     MAIL_SERVER="smtp.gmail.com",
     MAIL_STARTTLS=True,
@@ -79,6 +84,27 @@ mail_conf = ConnectionConfig(
 
 def get_db():
     return psycopg2.connect(DATABASE_URL)
+
+# =========================================
+# 🏗️ AUTO-CREATE TABLES ON NEON (Line 78 ke baad dalo)
+# =========================================
+def init_db():
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        # Apni schema.sql file ko read karo
+        with open("schema.sql", "r") as f:
+            cur.execute(f.read())
+        conn.commit()
+        print("✅ Tables initialized on Neon Cloud!")
+    except Exception as e:
+        print(f"❌ DB Init Error: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+# Is line ko FastAPI app start hone se pehle execute karo
+init_db()
 
 # =========================================
 # 🔐 JWT VERIFY FUNCTION
@@ -330,18 +356,19 @@ async def razorpay_webhook(request: Request):
 # =========================================
 # 📞 WHATSAPP WEBHOOK VERIFICATION (GET)
 # =========================================
+from fastapi.responses import Response # <-- Ye sabse upar hona chahiye
+
 @app.get("/whatsapp-webhook")
 async def verify_webhook(request: Request):
     params = request.query_params
-    # 🚨 'nexora_secret_123' ko Meta Portal ke 'Verify Token' mein bhi yahi likhna
     if params.get("hub.verify_token") == "nexora_secret_123":
-        from fastapi.responses import Response
-        # Meta ko 'challenge' wapas bhejna zaroori hai
-        return Response(content=params.get("hub.challenge"), media_type="text/plain")
-    
-    print("❌ Webhook Verification Failed: Token Mismatch")
-    return {"error": "Invalid verification token"}
-
+        challenge = params.get("hub.challenge")
+        return Response(
+            content=challenge, 
+            media_type="text/plain",
+            headers={"ngrok-skip-browser-warning": "true"}
+        )
+    return {"error": "Invalid token"}
 import uuid 
 
 class PaymentVerifyRequest(BaseModel):
@@ -422,122 +449,134 @@ async def google_login(data: dict):
 # main.py - Smart Sales AI Update
 
 @app.post("/whatsapp-webhook")
-def whatsapp_webhook(data: WhatsAppMessage, user = Depends(verify_token)):
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
-    print(f"🚀 Webhook triggered for Biz: {data.biz_id}, Message: {data.message}")
-
+async def whatsapp_webhook(request: Request):
+    conn = None # 🌟 Pehle hi define kar diya taaki finally block na phate
     try:
-        # 1. Fetch Business Info
-        cur.execute("SELECT name, ai_tone, ai_prompt FROM businesses WHERE id=%s", (data.biz_id,))
-        biz = cur.fetchone()
-        biz_name = biz["name"] if biz else "Our Store"
-        ai_tone = biz.get("ai_tone", "professional") if biz else "professional"
-
-        # 2. Fetch Product Catalog
-        cur.execute("SELECT name, price, description FROM products WHERE business_id=%s", (data.biz_id,))
-        products = cur.fetchall()
+        body = await request.json()
         
-        if products:
-            catalog_text = "Our Products:\n"
-            for p in products:
-                catalog_text += f"- {p['name']}: ₹{p['price']} - {p['description']}\n"
-        else:
-            catalog_text = "Products catalog is being updated."
+        # --- BLOCK 1: Meta Webhook Logic ---
+        if "entry" in body:
+            for entry in body["entry"]:
+                for change in entry.get("changes", []):
+                    value = change.get("value", {})
+                    if "messages" in value:
+                        message_obj = value["messages"][0]
+                        
+                        # 🚨 YE LINE ADD KARO (Loop isi se rukega):
+                        if "text" not in message_obj:
+                            return Response(content="EVENT_RECEIVED", status_code=200)
 
-        # 3. Fetch Last 8 messages (Correct order - ASC)
-        cur.execute("""
-            SELECT role, content FROM conversation_history 
-            WHERE business_id=%s AND customer_phone=%s 
-            ORDER BY created_at ASC
-            LIMIT 8
-        """, (data.biz_id, data.phone))
-        history = cur.fetchall()
+                        customer_phone = message_obj["from"]
+                        text = message_obj.get("text", {}).get("body", "")
+                        biz_id = os.getenv("TEST_BIZ_ID")
 
-        # 4. Build conversation history string
-        history_lines = []
-        for h in history:
-            role_label = "Customer" if h["role"] == "user" else "Sales Agent"
-            history_lines.append(f"{role_label}: {h['content']}")
-        history_text = "\n".join(history_lines) if history_lines else ""
+                        print(f"🚀 AI Processing for: {customer_phone}, Msg: {text}")
 
-        # 5. Smart System Prompt - Catalog sirf tabhi dikhao jab zaroorat ho
-        system_prompt = f"""You are an expert sales agent for {biz_name}. 
-        Tone: {ai_tone}
+                        conn = get_db()
+                        cur = conn.cursor(cursor_factory=RealDictCursor)
 
-        STRICT INSTRUCTIONS:
-        1. NEVER say "I am repeating" or "As mentioned before". Always provide a fresh, helpful response.
-        2. If the customer repeats a question, explain it using different words or examples.
-        3. Use the conversation history below ONLY to understand context, NOT to copy previous answers.
-        4. Reply in the SAME language the customer is using.
+                        # 1️⃣ Database se 'plan_tier' uthao
+                        cur.execute("SELECT name, ai_tone, plan_tier FROM businesses WHERE id=%s", (biz_id,))
+                        biz = cur.fetchone()
 
-        CATALOG:
-        {catalog_text}
+                        biz_name = biz["name"] if biz else "Our Store"
+                        ai_tone = biz.get("ai_tone", "professional") if biz else "professional"
+                        current_plan = biz.get("plan_tier", "STARTER") if biz else "STARTER"
 
-        HISTORY (For Context Only):
-        {history_text}"""
+                        # 2️⃣ Ab current month ka usage check karo (Ki kitne messages bheje hain)
+                        cur.execute("""
+                            SELECT COUNT(*) as usage 
+                            FROM conversation_history 
+                            WHERE business_id=%s AND role='assistant' 
+                            AND created_at > date_trunc('month', CURRENT_DATE)
+                        """, (biz_id,))
+                        usage_data = cur.fetchone()
+                        current_usage = usage_data["usage"] if usage_data else 0
 
-        # 6. Current customer message
-        prompt = f"{system_prompt}\n\nCustomer: {data.message}\nSales Agent:"
+                        # 3️⃣ PLAN LIMIT CHECK 🚨
+                        # PLAN_LIMITS tumhare code mein upar defined hain (STARTER: 500, PRO: 2000)
+                        limit = PLAN_LIMITS.get(current_plan, 500)
 
+                        if current_usage >= limit:
+                            print(f"🛑 Limit Reached for {biz_name} ({current_usage}/{limit})")
+                            # Customer ko reply nahi jayega, bas Meta ko 200 OK bhej do taaki wo retry na kare
+                            return Response(content="PLAN_LIMIT_EXCEEDED", status_code=200)
+
+                        print(f"✅ Plan: {current_plan} | Usage: {current_usage}/{limit}")
+
+                        cur.execute("SELECT name, price, description FROM products WHERE business_id=%s", (biz_id,))
+                        products = cur.fetchall()
+                        
+                        if products:
+                            catalog_text = "Our Products:\n" + "\n".join([f"- {p['name']}: ₹{p['price']}" for p in products])
+                        else:
+                            catalog_text = "Currently updating our catalog with fresh items."
+
+                        system_prompt = f"""You are a sales agent for {biz_name}. 
+                        Tone: {ai_tone}. 
+                        STRICT RULES: 
+                        1. Keep replies under 2-3 short sentences. 
+                        2. Use bullet points for products.
+                        3. Don't be too robotic.
+                        CATALOG: {catalog_text}"""
+                        prompt = f"{system_prompt}\n\nCustomer: {text}\nSales Agent:"
+
+                        response = client.models.generate_content(
+                            model="gemini-3-flash-preview",
+                            contents=[{"role": "user", "parts": [{"text": prompt}]}]
+                        )
+                        reply = response.text.strip() if response and response.text else "Hello!"
+
+                        import requests
+                        url = f"https://graph.facebook.com/v22.0/{PHONE_NUMBER_ID}/messages"
+                        headers = {"Authorization": f"Bearer {WHATSAPP_TOKEN}", "Content-Type": "application/json"}
+                        payload = {
+                            "messaging_product": "whatsapp",
+                            "to": customer_phone,
+                            "type": "text",
+                            "text": {"body": reply}
+                        }
+
+                        res = requests.post(url, json=payload, headers=headers)
+                        print(f"📡 ACTUAL Meta Response: {res.status_code} - {res.json()}")
+                        
+                        conn.commit()
+                        # Yahan close karne ki zaroorat nahi kyunki finally handle karega
+                        print(f"✅ Reply Sent and DB Updated")
+
+            # Status updates ke liye response
+            return Response(content="EVENT_RECEIVED", status_code=200)
+
+        # --- BLOCK 2: Dashboard Chat Logic (Optional/Legacy) ---
+        # Note: Agar data frontend se aa raha hai (WhatsAppMessage model)
+        # Ye block tabhi chalega jab upar wala condition fail ho
+        data = body # Assuming body matches WhatsAppMessage structure if not from Meta
         
-        
-        
-        # 🤖 Gemini API Call (Official SDK Format)
-        try:
-            # 🚨 Model name ke aage 'models/' mat lagao
-            response = client.models.generate_content(
-                model="gemini-3-flash-preview",
-                contents=[{
-            "role": "user",
-            "parts": [{"text": prompt}]
-        }])
-            
-            if response.text:
-                reply = response.text.strip()
-            else:
-                reply = "Main aapki kya madad kar sakta hoon?"
-                
-        except Exception as gem_e:
-            print(f"❌ Gemini Error: {str(gem_e)}")
-            reply = "Main abhi thoda busy hoon..."
+        if not conn:
+            conn = get_db()
+            cur = conn.cursor(cursor_factory=RealDictCursor)
 
-        # 8. Save conversation history
-        cur.execute("""
-            INSERT INTO conversation_history 
-            (business_id, customer_phone, role, content) 
-            VALUES (%s, %s, 'user', %s)
-        """, (data.biz_id, data.phone, data.message))
-        
-        cur.execute("""
-            INSERT INTO conversation_history 
-            (business_id, customer_phone, role, content) 
-            VALUES (%s, %s, 'assistant', %s)
-        """, (data.biz_id, data.phone, reply))
+        response = client.models.generate_content(
+            model="gemini-3-flash-preview",
+            contents=[{"role": "user", "parts": [{"text": data.get("message", "")}]}]
+        )
+        reply = response.text.strip() if response.text else "Main aapki kya madad kar sakta hoon?"
 
-        # 9. Lead Scoring
-        score, classification, _ = score_lead(data.message)
-        cur.execute("""
-            INSERT INTO leads (business_id, customer_phone, classification, latest_intent)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (customer_phone) DO UPDATE 
-            SET classification=EXCLUDED.classification, 
-                latest_intent=EXCLUDED.latest_intent,
-                updated_at=NOW()
-        """, (data.biz_id, data.phone, classification, data.message[:100]))
+        cur.execute("INSERT INTO conversation_history (business_id, customer_phone, role, content) VALUES (%s, %s, 'user', %s)", (data.get("biz_id"), data.get("phone"), data.get("message")))
+        cur.execute("INSERT INTO conversation_history (business_id, customer_phone, role, content) VALUES (%s, %s, 'assistant', %s)", (data.get("biz_id"), data.get("phone"), reply))
 
         conn.commit()
-        print(f"✅ Reply sent: {reply[:80]}...")
+        return {"reply": reply}
 
     except Exception as e:
-        print(f"🔥 Backend Crash: {e}")
+        print(f"🔥 Error: {e}")
         import traceback
         traceback.print_exc()
-        reply = "Service temporary issue. Please try again."
+        return Response(content="OK", status_code=200)
     finally:
-        conn.close()
-
-    return {"reply": reply}
+        if conn is not None: # 🔌 Safety Check: Sirf tabhi close hoga jab open hua ho
+            conn.close()
+            print("🔌 Connection closed safely")
 
 # =========================================
 # 📊 INVESTOR METRICS
