@@ -94,7 +94,7 @@ export default function Products({
                       const formData = new FormData();
                       formData.append("file", file);
                       try {
-                        const res = await fetch("http://127.0.0.1:8000/upload-image", { method: "POST", body: formData });
+                        const res = await fetch("https://api.nexoragent.com/upload-image", { method: "POST", body: formData });
                         const data = await res.json();
                         setNewProduct({ ...newProduct, image_url: data.url });
                         alert("Photo Uploaded! ✅");

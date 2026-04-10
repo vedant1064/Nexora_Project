@@ -76,7 +76,7 @@ export default function Pricing() {
   try {
     const token = localStorage.getItem("token");
 
-    const response = await fetch("http://127.0.0.1:8000/verify-payment", {
+    const response = await fetch('${API_BASE_URL}/verify-payment', {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",
@@ -88,7 +88,7 @@ export default function Pricing() {
         razorpay_order_id: paymentDetails.razorpay_order_id || "test_order_id",
         razorpay_signature: paymentDetails.razorpay_signature || "test_sig",
         plan_name: plan.name,
-        business_id: localStorage.getItem("business_id") || "622bb52f-af29-4615-874f-ac49b3328b6c" 
+        business_id: localStorage.getItem("business_id")  
       })
     });
 

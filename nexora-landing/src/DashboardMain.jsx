@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 import { motion, AnimatePresence } from "framer-motion";
-
+const API_BASE_URL = "https://api.nexoragent.com";
 export default function DashboardMain() {
   const BIZ_ID = localStorage.getItem("business_id");
   const token = localStorage.getItem("token");
@@ -40,7 +40,7 @@ export default function DashboardMain() {
   const [page, setPage] = useState("dashboard");
   // --- PAYMENT LOGIC START ---
 const handleSubscription = (planKey) => {
-  fetch("http://127.0.0.1:8000/create-subscription", {
+  fetch(`${API_BASE_URL}/create-subscription`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ biz_id: BIZ_ID, plan_key: planKey })
@@ -63,7 +63,7 @@ const handleSubscription = (planKey) => {
         alert("Bhai, Payment Chaka-chak ho gayi! ID: " + res.razorpay_payment_id);
 
         // Backend ko payment verify karne ke liye call karo
-        fetch("http://127.0.0.1:8000/verify-payment", {
+        fetch('${API_BASE_URL}/verify-payment', {
           method: "POST",
           headers: { 
             "Content-Type": "application/json", 
@@ -123,7 +123,7 @@ const handleSubscription = (planKey) => {
   });
 
   const fetchAnalytics = () => {
-    fetch(`http://127.0.0.1:8000/analytics/${BIZ_ID}`, { 
+    fetch('${API_BASE_URL}/analytics/${BIZ_ID}', {
       headers: { Authorization: `Bearer ${token}` } 
     })
     .then(res => res.json())
@@ -135,7 +135,7 @@ const handleSubscription = (planKey) => {
     if (!BIZ_ID || !token) return;
 
     // Fetch Profile
-    fetch(`http://127.0.0.1:8000/me/${BIZ_ID}`, { 
+    fetch('${API_BASE_URL}/me/${BIZ_ID}', { 
       headers: { Authorization: `Bearer ${token}` } 
     })
     .then(res => res.json())
@@ -154,7 +154,7 @@ const handleSubscription = (planKey) => {
     
     if (!currentId || currentId === "null" || !currentToken) return;
 
-    fetch(`http://127.0.0.1:8000/leads/${currentId}`, { 
+    fetch('${API_BASE_URL}/leads/${currentId}', {
       headers: { Authorization: `Bearer ${currentToken}` } 
     })
     .then(res => res.json())
@@ -170,7 +170,7 @@ const handleSubscription = (planKey) => {
 
   if (!currentId || !currentToken) return;
 
-  fetch(`http://127.0.0.1:8000/products/${currentId}`, { 
+  fetch('${API_BASE_URL}/products/${currentId}', {
     headers: { Authorization: `Bearer ${currentToken}` } 
   })
   .then(res => res.json())
@@ -202,7 +202,7 @@ const handleSubscription = (planKey) => {
   setChatMessages(prev => [...prev, userMsg]);
   setChatLoading(true);
 
-  fetch("http://127.0.0.1:8000/whatsapp-webhook", {
+  fetch('${API_BASE_URL}/whatsapp-webhook', {
     method: "POST",
     headers: { 
       "Content-Type": "application/json", 
@@ -253,7 +253,7 @@ const loadChatHistory = (phone) => {
   setPage("chat");
   
   // 2. Phir us specific number ki history fetch karo
-  fetch(`http://127.0.0.1:8000/chat-history/${BIZ_ID}/${phone}`, {
+  fetch('${API_BASE_URL}/chat-history/${BIZ_ID}/${phone}', {
     headers: { Authorization: `Bearer ${token}` }
   })
   .then(res => res.json())
@@ -288,7 +288,7 @@ const loadChatHistory = (phone) => {
 
   console.log("🚀 Sending Product:", productData);
 
-  fetch("http://127.0.0.1:8000/products", {
+  fetch('${API_BASE_URL}/products', {
     method: "POST",
     headers: { 
       "Content-Type": "application/json",
@@ -350,7 +350,7 @@ const loadChatHistory = (phone) => {
     stock_quantity: parseInt(newProduct.stock_quantity) || 0
   };
 
-  fetch(`http://127.0.0.1:8000/products/${editingProduct.id}`, {
+  fetch('${API_BASE_URL}/products/${editingProduct.id}', {
     method: "PUT", // 👈 Naya banane ki jagah 'Update' karega
     headers: { 
       "Content-Type": "application/json",
@@ -371,7 +371,7 @@ const loadChatHistory = (phone) => {
   const deleteProduct = (id) => {
     if (!window.confirm("Bhai, kya aap is product ko delete karna chahte hain?")) return;
 
-    fetch(`http://127.0.0.1:8000/products/${id}`, {
+    fetch('${API_BASE_URL}/products/${id}', {
       method: "DELETE",
       headers: { "Authorization": `Bearer ${token}` }
     })
@@ -713,13 +713,13 @@ const SettingsUI = ({ bizId, token }) => {
   const [settings, setSettings] = useState({ ai_tone: "professional", ai_prompt: "" });
 
   useEffect(() => {
-    fetch(`http://127.0.0.1:8000/business/${bizId}`, { headers: { Authorization: `Bearer ${token}` } })
+    fetch('${API_BASE_URL}/business/${bizId}', { headers: { Authorization: `Bearer ${token}` } })
     .then(res => res.json())
     .then(data => { if(data) setSettings({ ai_tone: data.ai_tone || "professional", ai_prompt: data.ai_prompt || "" }); });
   }, [bizId, token]);
 
   const handleSave = () => {
-    fetch("http://127.0.0.1:8000/ai-settings", {
+    fetch('${API_BASE_URL}/ai-settings', {
       method: "PUT",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
       body: JSON.stringify({ 

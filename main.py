@@ -48,7 +48,11 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Filhal debugging ke liye sab allow kar do
+    allow_origins=[
+        "http://localhost:5173",    # Tera local React frontend
+        "https://api.nexoragent.com", # Tera backend domain
+        "https://nexoragent.com",     # Agar tera frontend live hai toh uska domain
+    ],  # Filhal debugging ke liye sab allow kar do
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
