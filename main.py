@@ -1,7 +1,7 @@
 # =========================================
 # 🚀 AUTONEX AI - ENTERPRISE v1.2 HARDENED + SMART AI REPLY
 # =========================================
-from fastapi import UploadFile, File
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 import shutil
 from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI, HTTPException, Request
@@ -671,13 +671,15 @@ def edit_product(product_id: str, data: ProductCreate, user = Depends(verify_tok
     return {"status": "success", "message": "Product updated!"}
 
 @app.post("/upload-image")
-async def upload_image(file: UploadFile = File(...)):
+async def upload_image(request: Request, file: UploadFile = File(...)):
     os.makedirs("static/products", exist_ok=True)
     file_path = f"static/products/{file.filename}"
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
-    # Ye URL return karega jo DB mein save hoga
-    return {"url": f"http://127.0.0.1:8000/{file_path}"}
+    
+    # Ye line VS Code ka error khatam kar degi
+    base_url = str(request.base_url).rstrip("/")
+    return {"url": f"{base_url}/{file_path}"}
 
 @app.get("/products/{business_id}")
 def get_products(business_id: str, user = Depends(verify_token)):
