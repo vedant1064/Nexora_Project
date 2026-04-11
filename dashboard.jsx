@@ -4,6 +4,9 @@
 import React, { useState } from "react";
 import { Flame, Thermometer, TrendingUp, MessageSquare } from "lucide-react";
 
+// 1. Pehle .env se value uthakar ek variable mein dalo
+const BIZ_ID = import.meta.env.TEST_BIZ_ID;
+
 
 // =============================
 // Lead Panel (Premium Only)
@@ -233,7 +236,7 @@ const Dashboard = () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        biz_id: "622bb52f-af29-4615-874f-ac49b3328b6c",
+        biz_id: BIZ_ID,
         plan: selectedPlan,
       }),
     });

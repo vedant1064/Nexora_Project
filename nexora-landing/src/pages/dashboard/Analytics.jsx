@@ -12,7 +12,7 @@ export default function Analytics() {
 
   async function loadAnalytics() {
     try {
-      const res = await fetch(`http://127.0.0.1:8000/analytics/${businessId}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/analytics/${businessId}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       const result = await res.json();

@@ -8,7 +8,7 @@ export default function Profile() {
 
     const bizId = localStorage.getItem("business_id");
 
-    fetch(`http://127.0.0.1:8000/me/${bizId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/me/${bizId}`)
       .then(res => res.json())
       .then(data => setUser(data));
 

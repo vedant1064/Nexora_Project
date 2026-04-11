@@ -76,7 +76,7 @@ export default function Pricing() {
   try {
     const token = localStorage.getItem("token");
 
-    const response = await fetch('${API_BASE_URL}/verify-payment', {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/verify-payment`, {
       method: "POST",
       headers: { 
         "Content-Type": "application/json",

@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 import { motion, AnimatePresence } from "framer-motion";
-const API_BASE_URL = "https://api.nexoragent.com";
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 export default function DashboardMain() {
   const BIZ_ID = localStorage.getItem("business_id");
   const token = localStorage.getItem("token");

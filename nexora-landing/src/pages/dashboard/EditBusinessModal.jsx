@@ -7,7 +7,7 @@ export default function EditBusinessModal({ isOpen, onClose, currentName, BIZ_ID
   const updateBusinessName = () => {
     if (!newName.trim()) return alert("Bhai, naam toh likho!");
 
-    fetch(`http://127.0.0.1:8000/update-business/${BIZ_ID}`, {
+    fetch(`${import.meta.env.VITE_API_URL}/update-business/${BIZ_ID}`, {
       method: "PUT",
       headers: { 
         "Content-Type": "application/json", 

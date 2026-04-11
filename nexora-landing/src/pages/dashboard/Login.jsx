@@ -17,7 +17,7 @@ export default function Login() {
   const loginWithGoogle = useGoogleLogin({
     onSuccess: async (res) => {
       try {
-        const response = await fetch("https://api.nexoragent.com/google-login",{
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/google-login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token: res.access_token })
