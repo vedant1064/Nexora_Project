@@ -12,8 +12,8 @@ import LiveChat from "./pages/dashboard/LiveChat.jsx";
 import Pricing from "./pages/dashboard/Pricing.jsx";
 import Profile from "./pages/dashboard/Profile.jsx";
 import EditBusinessModal from "./pages/dashboard/EditBusinessModal.jsx";
-import Overview from "./pages/Dashboard/Overview"; // 👈 Path check kar lena sahi ho
-import AIStrategy from "./pages/Dashboard/AIStrategy"; // 👈 AIStrategy bhi import kar lo agar use kar rahe ho
+import Overview from "./pages/dashboard/Overview"; // 👈 Path check kar lena sahi ho
+import AIStrategy from "./pages/dashboard/AIStrategy"; // 👈 AIStrategy bhi import kar lo agar use kar rahe ho
 
 import { 
   LayoutDashboard, Zap, Users, Package, MessageSquare, 

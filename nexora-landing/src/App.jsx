@@ -4,8 +4,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 // 1. Dashboard & Auth Pages
 import DashboardMain from "./DashboardMain";
 import Login from "./pages/dashboard/Login";
-import Overview from './pages/Dashboard/Overview';
-import AIStrategy from './pages/Dashboard/AIStrategy';
+import Overview from './pages/dashboard/Overview';
+import AIStrategy from "./pages/dashboard/AIStrategy";
 
 // 2. Landing Page Imports
 import DashboardLayout from './components/DashboardLayout'; 
