@@ -33,10 +33,15 @@ export default function Analytics() {
   }
 
   useEffect(() => {
-    loadAnalytics();
-    const interval = setInterval(loadAnalytics, 10000);
-    return () => clearInterval(interval);
-  }, []);
+    // 🚦 Sirf tabhi call karo jab businessId aur token mil jaye
+    if (businessId && token) {
+      loadAnalytics();
+      const interval = setInterval(loadAnalytics, 10000);
+      return () => clearInterval(interval);
+    } else {
+      console.warn("Waiting for Business ID and Token...");
+    }
+  }, [businessId, token]); // Dependencies add karo
 
   // 🔴 1. ERROR STATE
   if (error) return (
