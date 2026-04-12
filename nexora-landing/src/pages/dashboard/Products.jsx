@@ -91,14 +91,30 @@ export default function Products({
                     onChange={async (e) => {
                       const file = e.target.files[0];
                       if (!file) return;
+
+                      const token = localStorage.getItem("token"); // 👈 1. Token nikaalo
                       const formData = new FormData();
                       formData.append("file", file);
+
                       try {
-                        const res = await fetch(`${import.meta.env.VITE_API_URL}/upload-image`, { method: "POST", body: formData });
+                        const res = await fetch(`${import.meta.env.VITE_API_URL}/upload-image`, { 
+                          method: "POST", 
+                          body: formData,
+                          headers: {
+                            "Authorization": `Bearer ${token}` // 👈 2. Token header mein dalo
+                          }
+                        });
+
                         const data = await res.json();
-                        setNewProduct({ ...newProduct, image_url: data.url });
-                        alert("Photo Uploaded! ✅");
-                      } catch (err) { alert("Upload Fail! Backend check karo."); }
+                        if (res.ok) {
+                          setNewProduct({ ...newProduct, image_url: data.url });
+                          alert("Photo Uploaded! ✅");
+                        } else {
+                          alert(`Upload Fail: ${data.detail || "Server Error"}`);
+                        }
+                      } catch (err) { 
+                        alert("Upload Fail! Connection check karo."); 
+                      }
                     }}
                   />
                   <label htmlFor="product-image-input" className="cursor-pointer flex items-center gap-4 text-gray-500 hover:text-indigo-400 group transition-all">
