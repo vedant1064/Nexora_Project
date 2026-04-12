@@ -1,8 +1,16 @@
 {
   "rewrites": [
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "source": "/dashboard/(.*)",
+      "destination": "/nexora-frontend/index.html"
+    },
+    {
+      "source": "/inventory/(.*)",
+      "destination": "/nexora-frontend/index.html"
+    },
+    {
+      "source": "/((?!dashboard|inventory).*)",
+      "destination": "/nexora-landing/index.html"
     }
   ]
 }
