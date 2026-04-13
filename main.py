@@ -435,7 +435,7 @@ async def google_login(data: dict):
     email = data.get("email") # Frontend se email aayega
     
     conn = get_db()
-    cur = conn.cursor(cursorgit_factory=RealDictCursor)
+    cur = conn.cursor(cursor_factory=RealDictCursor)
     cur.execute("SELECT business_id FROM users WHERE email=%s", (email,))
     user = cur.fetchone()
     conn.close()
