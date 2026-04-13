@@ -97,7 +97,7 @@ export default function Products({
                       formData.append("file", file);
 
                       try {
-                        const res = await fetch(`${import.meta.env.VITE_API_URL}/upload-image`, { 
+                        const res = await fetch(`${import.meta.env.API_URL}/upload-image`, { 
                           method: "POST", 
                           body: formData,
                           headers: {
