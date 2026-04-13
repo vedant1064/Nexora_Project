@@ -1,15 +1,15 @@
 {
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "https://tera-backend-url.vercel.app/api/$1"
+    },
+    {
       "source": "/dashboard/(.*)",
-      "destination": "/nexora-frontend/index.html"
+      "destination": "/nexora-frontend/public/index.html"
     },
     {
-      "source": "/inventory/(.*)",
-      "destination": "/nexora-frontend/index.html"
-    },
-    {
-      "source": "/((?!dashboard|inventory).*)",
+      "source": "/((?!api|dashboard).*)",
       "destination": "/nexora-landing/index.html"
     }
   ]
