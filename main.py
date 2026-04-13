@@ -431,22 +431,37 @@ async def verify_payment(data: PaymentVerifyRequest):
 
 @app.post("/google-login")
 async def google_login(data: dict):
-    # 🚨 Dummy ID hata kar ab asli logic chalega
-    email = data.get("email") # Frontend se email aayega
+    email = data.get("email")
+    name = data.get("name", "Nexora User") # Frontend se name bhi pass karwa lena
     
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
+    
+    # 1. Check if user exists
     cur.execute("SELECT business_id FROM users WHERE email=%s", (email,))
     user = cur.fetchone()
-    conn.close()
 
     if not user:
-        raise HTTPException(status_code=404, detail="User not found. Please register.")
+        # 2. Agar user nahi hai, toh naya BIZ_ID banao aur register karo
+        import uuid
+        new_biz_id = f"BIZ_{str(uuid.uuid4())[:8]}"
+        
+        # Businesses table mein entry
+        cur.execute("INSERT INTO businesses (id, name, plan_tier) VALUES (%s, %s, %s)", 
+                    (new_biz_id, f"{name}'s Store", "STARTER"))
+        
+        # Users table mein entry
+        cur.execute("INSERT INTO users (email, name, business_id) VALUES (%s, %s, %s)", 
+                    (email, name, new_biz_id))
+        
+        conn.commit()
+        business_id = new_biz_id
+        print(f"✅ New User Registered: {email} with ID: {business_id}")
+    else:
+        business_id = user["business_id"]
 
-    return {
-        "status": "success",
-        "business_id": user["business_id"] # Asli ID return hogi
-    }
+    conn.close()
+    return {"status": "success", "business_id": business_id}
 
 # =========================================
 # 🤖 WHATSAPP AI ENGINE (SMART VERSION)
