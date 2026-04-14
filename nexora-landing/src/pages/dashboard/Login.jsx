@@ -3,8 +3,7 @@ import { useGoogleLogin, useGoogleOneTapLogin } from '@react-oauth/google';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
-const BACKEND = import.meta.env.VITE_API_URL;
-
+const BACKEND = "https://api.nexoragent.com";
 async function sendToBackend(token, navigate) {
   if (!token) return alert("Google ne token nahi diya!");
 
@@ -38,19 +37,27 @@ export default function Login() {
   });
 
   const loginWithGoogle = useGoogleLogin({
-  // 🚨 flow: 'implicit' hatao agar hai, aur niche waala logic dalo
   onSuccess: async (tokenResponse) => {
-    console.log("🚀 Google Response:", tokenResponse);
-    
-    // Agar 'credential' (ID Token) nahi mil raha, toh hume access_token 
-    // se user info nikalni padegi ya One Tap use karna padega.
-    if (tokenResponse.credential) {
-      sendToBackend(tokenResponse.credential, navigate);
-    } else {
-      // Alternately: Agar sirf access_token mil raha hai, toh backend 
-      // ko verify_oauth2_token ki jagah userinfo endpoint use karna hoga.
-      // Sabse best hai 'One Tap' ka use karna jo niche already set hai.
-      alert("Please use the 'One Tap' login at the top or check your Google Config.");
+    console.log("🚀 Access Token Received:", tokenResponse.access_token);
+
+    try {
+      // 1. Access Token se Google ki UserInfo API hit karo
+      const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+      });
+      
+      const userInfo = await userInfoRes.json();
+      console.log("👤 User Identity Found:", userInfo);
+
+      // 2. Ab 'sub' (Unique Google ID) ko credential ki jagah bhej do
+      // Backend ko verify_oauth2_token mein segments chahiye, 
+      // isliye hum pura userInfo hi bhej dete hain ya One Tap focus rakhte hain.
+      // Sabse solid tarika: Backend ko direct sub aur email bhejo.
+      
+      sendToBackend(tokenResponse.access_token, navigate); 
+      // 🚨 NOTE: Iske liye main.py mein ek chota sa 'if' dalna hoga
+    } catch (err) {
+      console.error("Identity Fetch Failed:", err);
     }
   },
 });
