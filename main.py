@@ -429,34 +429,39 @@ async def verify_payment(data: PaymentVerifyRequest):
         cur.close()
         conn.close()
 
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+
 @app.post("/google-login")
 async def google_login(data: dict):
-    email = data.get("email")
-    name = data.get("name", "Nexora User") # Frontend se name bhi pass karwa lena
+    token = data.get("credential")
     
+    try:
+        idinfo = id_token.verify_oauth2_token(
+            token, 
+            google_requests.Request(), 
+            os.getenv("GOOGLE_CLIENT_ID")
+        )
+        email = idinfo["email"]
+        name = idinfo.get("name", "Nexora User")
+    except Exception as e:
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    
-    # 1. Check if user exists
+
     cur.execute("SELECT business_id FROM users WHERE email=%s", (email,))
     user = cur.fetchone()
 
     if not user:
-        # 2. Agar user nahi hai, toh naya BIZ_ID banao aur register karo
         import uuid
         new_biz_id = f"BIZ_{str(uuid.uuid4())[:8]}"
-        
-        # Businesses table mein entry
-        cur.execute("INSERT INTO businesses (id, name, plan_tier) VALUES (%s, %s, %s)", 
+        cur.execute("INSERT INTO businesses (id, name, plan_tier) VALUES (%s, %s, %s)",
                     (new_biz_id, f"{name}'s Store", "STARTER"))
-        
-        # Users table mein entry
-        cur.execute("INSERT INTO users (email, name, business_id) VALUES (%s, %s, %s)", 
+        cur.execute("INSERT INTO users (email, name, business_id) VALUES (%s, %s, %s)",
                     (email, name, new_biz_id))
-        
         conn.commit()
         business_id = new_biz_id
-        print(f"✅ New User Registered: {email} with ID: {business_id}")
     else:
         business_id = user["business_id"]
 

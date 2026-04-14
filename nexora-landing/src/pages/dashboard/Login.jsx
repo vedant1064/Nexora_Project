@@ -1,44 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useGoogleLogin, useGoogleOneTapLogin } from '@react-oauth/google';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom'; // 👈 1. Import useNavigate
+import { useNavigate } from 'react-router-dom';
+
+const BACKEND = import.meta.env.VITE_API_URL;
+
+async function sendToBackend(credential, navigate) {
+  try {
+    const response = await fetch(`${BACKEND}/google-login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credential })
+    });
+    const data = await response.json();
+    if (data.business_id) {
+      localStorage.setItem("business_id", data.business_id);
+      navigate("/dashboard");
+    } else {
+      alert("Login failed: " + JSON.stringify(data));
+    }
+  } catch (err) {
+    console.error("Login Error:", err);
+    alert("Backend connection failed!");
+  }
+}
 
 export default function Login() {
   const [isLogoSet, setIsLogoSet] = useState(false);
-  const navigate = useNavigate(); // 👈 2. Initialize hook
+  const navigate = useNavigate();
 
   useGoogleOneTapLogin({
-    onSuccess: (res) => {
-      localStorage.setItem("token", res.credential);
-      navigate("/"); // 👈 3. Dashboard ki jagah Landing par bhejo
-    },
+    onSuccess: (res) => sendToBackend(res.credential, navigate),
   });
 
   const loginWithGoogle = useGoogleLogin({
-    onSuccess: async (res) => {
-      try {
-        const response = await fetch(`${import.meta.env.API_URL}/google-login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: res.access_token })
-        });
-
-        const data = await response.json();
-
-        if (data.business_id) {
-          localStorage.setItem("token", data.token || res.access_token);
-          localStorage.setItem("business_id", data.business_id);
-          
-          // ✅ 4. Final Redirect Change
-          navigate("/"); // Dashboard se hatakar Home par
-        } else {
-          alert("Login failed: Business ID not returned from backend");
-        }
-      } catch (err) {
-        console.error("Login Error:", err);
-        alert("Backend connection failed during login!");
-      }
-    },
+    onSuccess: (res) => sendToBackend(res.access_token, navigate),
   });
 
   const boxClass = "w-full flex items-center justify-center gap-3 border border-white/10 bg-[#111111] hover:bg-[#181818] py-3 rounded-xl transition-all duration-200 cursor-pointer shadow-lg active:scale-[0.98] group";
