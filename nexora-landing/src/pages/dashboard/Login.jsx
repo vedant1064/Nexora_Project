@@ -3,15 +3,16 @@ import { useGoogleLogin, useGoogleOneTapLogin } from '@react-oauth/google';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
-const BACKEND = "https://api.nexoragent.com";
-async function sendToBackend(token, navigate) {
-  if (!token) return alert("Google ne token nahi diya!");
+const BACKEND = "https://api.nexoragent.com"; 
 
-  try { // 👈 Try yahan se shuru
+async function sendToBackend(token, navigate) {
+  console.log("🚀 Attempting to send token:", token ? "Token Found" : "MISSING");
+  
+  try {
     const response = await fetch(`${BACKEND}/google-login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ credential: token })
+      body: JSON.stringify({ credential: token }) // 👈 Spelling check 'credential'
     });
 
     const data = await response.json();
