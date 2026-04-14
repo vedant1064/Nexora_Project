@@ -38,17 +38,22 @@ export default function Login() {
   });
 
   const loginWithGoogle = useGoogleLogin({
-  onSuccess: (res) => {
-    // 🚨 Check karo console mein ki kya aa raha hai
-    console.log("Full Google Response:", res);
+  // 🚨 flow: 'implicit' hatao agar hai, aur niche waala logic dalo
+  onSuccess: async (tokenResponse) => {
+    console.log("🚀 Google Response:", tokenResponse);
     
-    // Agar credential nahi hai, toh hum 'access_token' bhejenge 
-    // par uske liye backend ko segments wala JWT chahiye hota hai.
-    sendToBackend(res.credential || res.access_token, navigate);
+    // Agar 'credential' (ID Token) nahi mil raha, toh hume access_token 
+    // se user info nikalni padegi ya One Tap use karna padega.
+    if (tokenResponse.credential) {
+      sendToBackend(tokenResponse.credential, navigate);
+    } else {
+      // Alternately: Agar sirf access_token mil raha hai, toh backend 
+      // ko verify_oauth2_token ki jagah userinfo endpoint use karna hoga.
+      // Sabse best hai 'One Tap' ka use karna jo niche already set hai.
+      alert("Please use the 'One Tap' login at the top or check your Google Config.");
+    }
   },
-  // flow: 'auth-code' ya default implicit flow check karna padta hai
 });
-
   const boxClass = "w-full flex items-center justify-center gap-3 border border-white/10 bg-[#111111] hover:bg-[#181818] py-3 rounded-xl transition-all duration-200 cursor-pointer shadow-lg active:scale-[0.98] group";
 
   return (
