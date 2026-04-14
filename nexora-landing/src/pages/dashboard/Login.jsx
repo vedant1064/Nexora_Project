@@ -34,7 +34,7 @@ export default function Login() {
   });
 
   const loginWithGoogle = useGoogleLogin({
-    onSuccess: (res) => sendToBackend(res.access_token, navigate),
+    onSuccess: (res) => sendToBackend(res.credential, navigate),
   });
 
   const boxClass = "w-full flex items-center justify-center gap-3 border border-white/10 bg-[#111111] hover:bg-[#181818] py-3 rounded-xl transition-all duration-200 cursor-pointer shadow-lg active:scale-[0.98] group";
