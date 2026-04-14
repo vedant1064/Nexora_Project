@@ -440,7 +440,7 @@ async def google_login(data: dict):
         idinfo = id_token.verify_oauth2_token(
             token, 
             google_requests.Request(), 
-            os.getenv("GOOGLE_CLIENT_ID")
+            os.getenv("VITE_GOOGLE_CLIENT_ID")
         )
         email = idinfo["email"]
         name = idinfo.get("name", "Nexora User")
