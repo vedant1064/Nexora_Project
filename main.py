@@ -471,7 +471,15 @@ async def google_login(data: dict):
         else:
             business_id = user["business_id"]
 
-        return {"status": "success", "business_id": business_id}
+        # login function ke return mein 'token' add karo
+        token_value = f"JWT_{business_id}_{str(uuid.uuid4())[:8]}"
+
+        # 2. Return block - Sabse important change yahan hai!
+        return {
+            "status": "success", 
+            "business_id": str(business_id), # business_id use karo, user_id nahi!
+            "token": token_value
+        }
     finally:
         cur.close()
         conn.close()

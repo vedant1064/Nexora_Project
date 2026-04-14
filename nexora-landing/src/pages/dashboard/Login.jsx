@@ -18,6 +18,7 @@ async function sendToBackend(token, navigate) {
     const data = await response.json();
     if (data.business_id) {
       localStorage.setItem("business_id", data.business_id);
+      localStorage.setItem("token", data.token);
       navigate("/dashboard");
     } else {
       alert("Login failed: " + JSON.stringify(data));
