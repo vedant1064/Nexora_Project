@@ -427,7 +427,7 @@ from google.auth.transport import requests as google_requests
 
 @app.post("/google-login")
 async def google_login(data: dict):
-    token = data.get("credential")
+    token = data.get("credential").strip()
     client_id = os.getenv("VITE_GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID")
     
     try:
