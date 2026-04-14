@@ -5,13 +5,16 @@ import { useNavigate } from 'react-router-dom';
 
 const BACKEND = import.meta.env.VITE_API_URL;
 
-async function sendToBackend(credential, navigate) {
-  try {
+async function sendToBackend(token, navigate) {
+  if (!token) return alert("Google ne token nahi diya!");
+
+  try { // 👈 Try yahan se shuru
     const response = await fetch(`${BACKEND}/google-login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ credential })
+      body: JSON.stringify({ credential: token })
     });
+
     const data = await response.json();
     if (data.business_id) {
       localStorage.setItem("business_id", data.business_id);
@@ -19,11 +22,11 @@ async function sendToBackend(credential, navigate) {
     } else {
       alert("Login failed: " + JSON.stringify(data));
     }
-  } catch (err) {
+  } catch (err) { // 👈 Catch seedha Try ke band hone ke baad aana chahiye
     console.error("Login Error:", err);
     alert("Backend connection failed!");
   }
-}
+} // 👈 Function yahan band hoga
 
 export default function Login() {
   const [isLogoSet, setIsLogoSet] = useState(false);
@@ -34,8 +37,16 @@ export default function Login() {
   });
 
   const loginWithGoogle = useGoogleLogin({
-    onSuccess: (res) => sendToBackend(res.credential, navigate),
-  });
+  onSuccess: (res) => {
+    // 🚨 Check karo console mein ki kya aa raha hai
+    console.log("Full Google Response:", res);
+    
+    // Agar credential nahi hai, toh hum 'access_token' bhejenge 
+    // par uske liye backend ko segments wala JWT chahiye hota hai.
+    sendToBackend(res.credential || res.access_token, navigate);
+  },
+  // flow: 'auth-code' ya default implicit flow check karna padta hai
+});
 
   const boxClass = "w-full flex items-center justify-center gap-3 border border-white/10 bg-[#111111] hover:bg-[#181818] py-3 rounded-xl transition-all duration-200 cursor-pointer shadow-lg active:scale-[0.98] group";
 
