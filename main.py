@@ -427,18 +427,26 @@ from google.auth.transport import requests as google_requests
 
 @app.post("/google-login")
 async def google_login(data: dict):
-    token = data.get("credential").strip()
-    client_id = os.getenv("VITE_GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID")
+    token_raw = data.get("credential")
+    if not token_raw:
+        raise HTTPException(status_code=400, detail="Token missing")
+    
+    # Safai aur format check
+    token = token_raw.strip()
+    
+    # HARDCODE karo client_id ko yahan, variable ka chakkar hi khatam
+    MY_CLIENT_ID = "182058134711-45ubosbhh8dvhpl0tojs5svms8smrpo5.apps.googleusercontent.com"
     
     try:
-        # Audience fix added here
         idinfo = id_token.verify_oauth2_token(
             token, 
             google_requests.Request(), 
-            audience=os.getenv("VITE_GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID")
+            audience=MY_CLIENT_ID
         )
         email = idinfo["email"]
         name = idinfo.get("name", "Nexora User")
+        
+        # Database logic... (baaki same rehne do)
     except Exception as e:
         print(f"Google Token Verify Error: {e}")
         raise HTTPException(status_code=401, detail=f"Invalid Google token: {str(e)}")
