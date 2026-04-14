@@ -60,7 +60,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL = "postgresql://neondb_owner:npg_8ThJBiRqEG9U@ep-blue-leaf-a1yg3384.ap-southeast-1.aws.neon.tech/neondb?sslmode=require"
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
