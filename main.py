@@ -431,28 +431,12 @@ async def google_login(data: dict):
     if not token_raw:
         raise HTTPException(status_code=400, detail="Token missing")
     
-    # Safai aur format check
-    # main.py ke google_login ke andar
     token = token_raw.strip()
-    if token.startswith("ya29."):
-        import requests
-        # Ye line Google se puchti hai "Bhai, ye ya29 wala banda kaun hai?"
-        user_res = requests.get(f"https://www.googleapis.com/oauth2/v3/userinfo?access_token={token}")
-        if user_res.status_code != 200:
-            raise HTTPException(status_code=401, detail="Google rejected this access token")
-        user_info = user_res.json()
-        email = user_info["email"]
-        name = user_info.get("name", "Nexora User")
-    else:
-        # Purana One-Tap logic
-        idinfo = id_token.verify_oauth2_token(token, google_requests.Request(), audience=MY_CLIENT_ID)
-        email = idinfo["email"]
-        name = idinfo.get("name", "Nexora User")
-    
-    # HARDCODE karo client_id ko yahan, variable ka chakkar hi khatam
+    # ✅ Client ID Hardcoded
     MY_CLIENT_ID = "182058134711-45ubosbhh8dvhpl0tojs5svms8smrpo5.apps.googleusercontent.com"
     
     try:
+        # ✅ Sirf JWT (ID Token) verify karega
         idinfo = id_token.verify_oauth2_token(
             token, 
             google_requests.Request(), 
@@ -461,10 +445,9 @@ async def google_login(data: dict):
         email = idinfo["email"]
         name = idinfo.get("name", "Nexora User")
         
-        # Database logic... (baaki same rehne do)
     except Exception as e:
-        print(f"Google Token Verify Error: {e}")
-        raise HTTPException(status_code=401, detail=f"Invalid Google token: {str(e)}")
+        print(f"🔥 Google Token Verify Error: {e}")
+        raise HTTPException(status_code=401, detail=f"Invalid JWT Token: {str(e)}")
 
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
@@ -476,7 +459,6 @@ async def google_login(data: dict):
         if not user:
             import uuid
             new_biz_id = f"BIZ_{str(uuid.uuid4())[:8]}"
-            # Business aur User dono create honge
             cur.execute("INSERT INTO businesses (id, name, plan_tier) VALUES (%s, %s, %s)",
                         (new_biz_id, f"{name}'s Store", "STARTER"))
             cur.execute("INSERT INTO users (email, name, business_id) VALUES (%s, %s, %s)",
@@ -486,13 +468,13 @@ async def google_login(data: dict):
         else:
             business_id = user["business_id"]
 
-        # login function ke return mein 'token' add karo
+        # ✅ Dashboard ke liye final session token generate karo
+        import uuid
         token_value = f"JWT_{business_id}_{str(uuid.uuid4())[:8]}"
 
-        # 2. Return block - Sabse important change yahan hai!
         return {
             "status": "success", 
-            "business_id": str(business_id), # business_id use karo, user_id nahi!
+            "business_id": str(business_id), 
             "token": token_value
         }
     finally:

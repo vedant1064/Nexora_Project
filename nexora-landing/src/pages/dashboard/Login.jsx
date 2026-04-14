@@ -38,28 +38,32 @@ export default function Login() {
 
   const loginWithGoogle = useGoogleLogin({
   onSuccess: async (tokenResponse) => {
-    console.log("🚀 Access Token Received:", tokenResponse.access_token);
-
+    const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+    });
+    const userInfo = await userInfoRes.json();
+    // Ab email aur name seedha backend ko bhejo
     try {
-      // 1. Access Token se Google ki UserInfo API hit karo
-      const userInfoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-        headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+      const response = await fetch(`${BACKEND}/google-login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          email: userInfo.email, 
+          name: userInfo.name 
+        })
       });
-      
-      const userInfo = await userInfoRes.json();
-      console.log("👤 User Identity Found:", userInfo);
-
-      // 2. Ab 'sub' (Unique Google ID) ko credential ki jagah bhej do
-      // Backend ko verify_oauth2_token mein segments chahiye, 
-      // isliye hum pura userInfo hi bhej dete hain ya One Tap focus rakhte hain.
-      // Sabse solid tarika: Backend ko direct sub aur email bhejo.
-      
-      sendToBackend(tokenResponse.access_token, navigate); 
-      // 🚨 NOTE: Iske liye main.py mein ek chota sa 'if' dalna hoga
+      const data = await response.json();
+      if (data.business_id) {
+        localStorage.setItem("business_id", data.business_id);
+        navigate("/dashboard");
+      } else {
+        alert("Login failed: " + JSON.stringify(data));
+      }
     } catch (err) {
-      console.error("Identity Fetch Failed:", err);
+      alert("Backend connection failed!");
     }
   },
+  onError: () => alert("Google Login Failed")
 });
   const boxClass = "w-full flex items-center justify-center gap-3 border border-white/10 bg-[#111111] hover:bg-[#181818] py-3 rounded-xl transition-all duration-200 cursor-pointer shadow-lg active:scale-[0.98] group";
 
