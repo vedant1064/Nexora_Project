@@ -1,16 +1,5 @@
 {
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "https://api.nexoragent.com/$1"
-    },
-    {
-      "source": "/dashboard/(.*)",
-      "destination": "/nexora-frontend/index.html"
-    },
-    {
-      "source": "/((?!api|dashboard).*)",
-      "destination": "/nexora-landing/index.html"
-    }
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
