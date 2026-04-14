@@ -120,17 +120,10 @@ from fastapi import Depends, Header
 
 # main.py ke verify_token function mein
 def verify_token(authorization: str = Header(None)):
-    # Ye line left se 4 spaces andar honi chahiye
+    # Abhi ke liye sirf ye check karo ki token hai ya nahi
     if not authorization:
         raise HTTPException(401, "Token missing")
-    
-    try:
-        # Ye 'token' wali line 8 spaces andar honi chahiye
-        token = authorization.split(" ")[1]
-        return {"user_id": "test_user"}
-    except Exception as e:
-        print(f"Auth Error: {e}")
-        return {"user_id": "test_user"}
+    return {"user_id": "authorized"}
 
 # =========================================
 # 📊 PLAN CONFIG
@@ -435,38 +428,45 @@ from google.auth.transport import requests as google_requests
 @app.post("/google-login")
 async def google_login(data: dict):
     token = data.get("credential")
+    client_id = os.getenv("VITE_GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID")
     
     try:
+        # Audience fix added here
         idinfo = id_token.verify_oauth2_token(
             token, 
             google_requests.Request(), 
-            os.getenv("VITE_GOOGLE_CLIENT_ID")
+            audience=os.getenv("VITE_GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID")
         )
         email = idinfo["email"]
         name = idinfo.get("name", "Nexora User")
     except Exception as e:
-        raise HTTPException(status_code=401, detail="Invalid Google token")
+        print(f"Google Token Verify Error: {e}")
+        raise HTTPException(status_code=401, detail=f"Invalid Google token: {str(e)}")
 
     conn = get_db()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
-    cur.execute("SELECT business_id FROM users WHERE email=%s", (email,))
-    user = cur.fetchone()
+    try:
+        cur.execute("SELECT business_id FROM users WHERE email=%s", (email,))
+        user = cur.fetchone()
 
-    if not user:
-        import uuid
-        new_biz_id = f"BIZ_{str(uuid.uuid4())[:8]}"
-        cur.execute("INSERT INTO businesses (id, name, plan_tier) VALUES (%s, %s, %s)",
-                    (new_biz_id, f"{name}'s Store", "STARTER"))
-        cur.execute("INSERT INTO users (email, name, business_id) VALUES (%s, %s, %s)",
-                    (email, name, new_biz_id))
-        conn.commit()
-        business_id = new_biz_id
-    else:
-        business_id = user["business_id"]
+        if not user:
+            import uuid
+            new_biz_id = f"BIZ_{str(uuid.uuid4())[:8]}"
+            # Business aur User dono create honge
+            cur.execute("INSERT INTO businesses (id, name, plan_tier) VALUES (%s, %s, %s)",
+                        (new_biz_id, f"{name}'s Store", "STARTER"))
+            cur.execute("INSERT INTO users (email, name, business_id) VALUES (%s, %s, %s)",
+                        (email, name, new_biz_id))
+            conn.commit()
+            business_id = new_biz_id
+        else:
+            business_id = user["business_id"]
 
-    conn.close()
-    return {"status": "success", "business_id": business_id}
+        return {"status": "success", "business_id": business_id}
+    finally:
+        cur.close()
+        conn.close()
 
 # =========================================
 # 🤖 WHATSAPP AI ENGINE (SMART VERSION)
